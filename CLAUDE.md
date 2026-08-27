@@ -66,6 +66,8 @@ Read this file first. Then the docs in `project-os/`, in this order:
 10. `project-os/BugAtlas.md` — the project's recurring bug classes. Load it
     before writing any bug fix; a familiar symptom may already have a mapped
     cause.
+11. `project-os/Mistakes.md` — the mistakes YOU made and were corrected on,
+    waiting to become rules. Read it at task pickup; it is deliberately short.
 
 When a task goes through an MCP server (Figma, analytics, any tool that talks
 to an outside service), also read that server's rules doc under
@@ -346,6 +348,22 @@ that file for a matching symptom first.
 History says a bug was fixed once. The atlas says it is a CLASS, and hands the
 next session the cause and the fix that held. Without it, the third occurrence
 costs as much as the first.
+
+### 20. A correction you were given is written down, once
+
+When Rotem corrects HOW you worked, a broken rule, a decision that was his, a
+skipped step, an assumption, add one row to `project-os/Mistakes.md` in the
+same reply, before the work continues.
+When the same slip happens a second time, it stops being a row: write the
+rule into the file that owns that behavior and retire the row. That file
+carries the map of which file owns what.
+
+Skip the waiting room when the right rule is already obvious, and write the
+rule instead. Skip it entirely for a product opinion Rotem simply overruled;
+being overruled is not an error.
+
+A correction that lives only in chat expires with the session, and the next
+session makes the same mistake with total confidence.
 
 ## Shortcuts (owner-triggered)
 
