@@ -1,4 +1,4 @@
-# Live Editor — working rules for your AI assistant
+# Rocket Editor — working rules for your AI assistant
 
 This is the first file the assistant reads, every session. It holds what a fresh
 session cannot know on its own: what this project is, who it answers to, and the
@@ -6,12 +6,12 @@ rules that override the assistant's own defaults.
 
 ## What this project is
 
-Live Editor — a local tool for editing the design of somebody else's website
+Rocket Editor — a local tool for editing the design of somebody else's website
 while it runs.
 
 Rotem consults for funded startups. He lands on a client's existing code, and
 today changing a color, a font, a spacing or a corner radius means hunting
-through files he did not write. Live Editor attaches to a client's project
+through files he did not write. Rocket Editor attaches to a client's project
 folder, opens their real running site inside itself, and lets him change design
 values through visual controls. Each change previews live, waits in a staging
 tray, and is written into the client's real files only when he presses Apply,
@@ -20,7 +20,7 @@ with a backup taken first and one-click undo.
 Right now the project is a fresh repository: this governance folder, the plan,
 and no application code yet. It will be a local web app, running on this machine
 rather than a hosted service; the framework is pinned when the first code lands.
-The plan that defines the product, phases and all, is `notes/Live-Editor-Plan.md`.
+The plan that defines the product, phases and all, is `notes/Rocket-Editor-Plan.md`.
 
 ## Who you work for
 
@@ -35,7 +35,7 @@ reading time.
 
 | Setting | Value |
 |---|---|
-| Project root | `J:\Projects\Live Editor` |
+| Project root | `J:\Projects\Rocket Editor` |
 | Local app | none yet, no application code exists |
 | Checks | none yet, no application code exists |
 
@@ -93,6 +93,11 @@ At pickup, name these six things:
 - Which files must not be touched.
 - What behavior must stay unchanged.
 - What QA must run before delivery.
+
+**A discussion is not a work order.** Specification, questions and design talk
+change no files, however finished the idea sounds. Building starts only when
+Rotem says build in so many words, or approves a written plan. (Promoted from
+`project-os/Mistakes.md` after the same slip twice, 2026-08-31.)
 
 ### 2. Smallest safe change wins
 
@@ -204,7 +209,7 @@ a task touches one, say so at pickup.
 
 ### 12. Every file you write stays inside the project root
 
-Everything you create or edit lives under `J:\Projects\Live Editor`. Never the
+Everything you create or edit lives under `J:\Projects\Rocket Editor`. Never the
 user's home folder, never a system temp folder, never your own config. No routing
 around it with a shell command.
 
@@ -222,7 +227,7 @@ owner, absent from git, and lost to every other session. A lesson or work rule
 the owner gives goes into `CLAUDE.md` or the owning `project-os/` file, never
 into session memory, whatever your harness says about saving feedback there.
 
-**One exception, and it is the whole product.** Live Editor exists to write into
+**One exception, and it is the whole product.** Rocket Editor exists to write into
 a client's project folder, which is by definition outside this root. That is the
 product's core capability, not a loophole: it applies only to a folder the owner
 has explicitly attached, only through the product's own write path, and never
@@ -364,6 +369,32 @@ being overruled is not an error.
 
 A correction that lives only in chat expires with the session, and the next
 session makes the same mistake with total confidence.
+
+### 21. This project is your only source
+
+Everything you use comes from THIS repo, Rotem's own words, or the tool
+documentation. Never another project on the machine.
+
+Concretely, never on your own initiative:
+
+- open another repository to see how it solved something,
+- copy a convention, a rule, a config, or a policy across from one,
+- treat another project's working setup as evidence about this one,
+- carry any of its code, content, or client material into this repo.
+
+**A missing piece is a question, not a search.** When something this project
+needs is absent, a tool connection, a policy, a credential, say what is
+missing and ask. Filling the hole from a neighbouring folder produces a
+setting nobody chose here, and it looks decided forever after.
+
+This project attaches to a CLIENT's folder by design, which makes the habit
+worse than untidy: two clients' material has no business meeting on one disk.
+
+The one exception is Rotem pointing you at a specific other project, in this
+conversation, for a named purpose. His instruction, his scope, that task only.
+
+Rule 12 keeps your WRITES inside the project. This rule keeps your READS and
+your reasoning inside it too.
 
 ## Shortcuts (owner-triggered)
 

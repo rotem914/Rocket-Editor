@@ -1,6 +1,6 @@
 # Visual QA
 
-This file is how Live Editor gets tested by being used: the method for
+This file is how Rocket Editor gets tested by being used: the method for
 driving the running app, the bar for what counts as a defect there, and the
 defects this project has produced before. Load it before a pass starts.
 
@@ -146,7 +146,7 @@ app, not something to read. Add or drop dimensions to fit the product.
 ## Always-look-for list — this project's own
 
 **Empty on purpose.** This is where the pass earns its keep, and it has to come
-from Live Editor's real defects. Seed it with the bootstrap recipe below, then
+from Rocket Editor's real defects. Seed it with the bootstrap recipe below, then
 let the calibration loop grow it.
 
 One row per defect-class: a short check, a severity, the **action that exercises

@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Rocket Class Copy",
+  "version": "1.0.0",
+  "description": "Always on: hold the key left of 1 to inspect. Hover shows a design bubble, click copies the element's ID card. The icon pauses one tab.",
+  "action": {
+    "default_title": "Rocket Class Copy: click to pause or resume this tab"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,10 +1,10 @@
-# Live Editor — Plan (the big version)
+# Rocket Editor — Plan (the big version)
 
 Status: PLAN ONLY — nothing implemented. Written 2026-08-27 from a 9-agent
 research + design pass (5 web/repo researchers, 3 architecture proposals from
 different lenses, 1 completeness critic). This doc is the synthesis.
 
-Moved into the Live Editor repository on 2026-08-27, when the project became
+Moved into the Rocket Editor repository on 2026-08-27, when the project became
 standalone. It was written while the plan was still to build this inside DS
 Tiger, so wherever it calls the editor a section of DS Tiger, read that as the
 surface it described, not where it now lives. The architecture section is the

@@ -1,6 +1,6 @@
 # Code review
 
-This file is the calibration for reviewing code in Live Editor: how severe a
+This file is the calibration for reviewing code in Rocket Editor: how severe a
 defect is *here*, which mistakes this project keeps making, and how findings get
 handed back. Load it before a review starts, not after it ends.
 
@@ -95,7 +95,7 @@ project actually is. For each one, the question to ask:
 ## Always-check list — this project's own
 
 **Empty on purpose.** This is the section that makes a review worth running, and
-it has to come from Live Editor, not from a catalogue. Seed it with the
+it has to come from Rocket Editor, not from a catalogue. Seed it with the
 bootstrap recipe below, then let the calibration loop grow it.
 
 One row per finding-class: a short title, a severity, something concrete enough to

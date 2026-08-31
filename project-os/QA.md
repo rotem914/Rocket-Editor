@@ -33,6 +33,7 @@ that errors, and a working route says nothing about a layout that clips.
 | Client state / cache | Reload. Mutate, then confirm fresh data arrives. |
 | Refactor | Re-check the old behavior. Prove nothing moved. |
 | Process / rules | Cross-links resolve, and the change is recorded in `project-os/History.md`. |
+| Browser extension (`tools/`) | Drive the content script on a test page: bubble rows per element kind, copy payload, key and click swallowing, hide on release. The pane browser loads no extensions, so the real load, key, clipboard and badge go to an owner checklist. |
 
 If a change spans rows, run every row it spans.
 

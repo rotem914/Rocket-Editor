@@ -1,4 +1,4 @@
-# Live Editor — Bug Atlas
+# Rocket Editor — Bug Atlas
 
 The map of this project's recurring bug classes.
 

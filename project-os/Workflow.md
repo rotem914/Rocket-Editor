@@ -1,6 +1,6 @@
 # Workflow — the mandatory process from idea to delivery
 
-This file is the path every change in Live Editor walks: request, plan, implementation, QA, documentation, delivery.
+This file is the path every change in Rocket Editor walks: request, plan, implementation, QA, documentation, delivery.
 
 It exists so the same steps run on every task regardless of size, and so the reasoning behind a change outlives the memory of the person who made it.
 

@@ -393,6 +393,14 @@ collect commands, flags, patterns and paths in ONE fenced block at the section's
 end, labeled skippable, and frame every decision in product terms.
 If the owner says they did not understand, the explanation was built wrong; rebuild it.
 
+**A question asking the owner to decide carries its own context, every time.**
+Before the options: what the thing is, what it does for him, and what actually
+changes for him depending on his answer, each in one line. Options alone are
+unanswerable, because they ask him to price a tradeoff whose terms he was never
+given. He did not write the spec and has not read it. A decision question that
+assumes otherwise is asking him to guess, and it produces either a wrong answer
+or another round of asking what it means.
+
 Repo-internal nouns are worse than syntax: they LOOK like plain English, so they
 slip past unnoticed and the owner cannot even tell they were jargon until asking.
 The test is not "is it correct" — it is "would the owner have to ask".

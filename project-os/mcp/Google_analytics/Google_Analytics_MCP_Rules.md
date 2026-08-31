@@ -10,7 +10,7 @@ directly instead of the owner exporting screenshots by hand.
 
 ## 0. Setup facts
 
-**Not wired yet, and there is nothing here to measure.** Live Editor is a local
+**Not wired yet, and there is nothing here to measure.** Rocket Editor is a local
 tool with no website and no visitors, so this server has no job on this project
 unless that changes. Fill the table if it ever does.
 
