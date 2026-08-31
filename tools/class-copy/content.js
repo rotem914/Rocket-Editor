@@ -1,7 +1,7 @@
 // Rocket Class Copy: content script.
-// Armed per tab from the toolbar icon. Hold the key left of 1 (physical
+// Always on; the toolbar icon pauses one tab. Hold the key left of 1 (physical
 // Backquote, layout-independent) to inspect: hover highlights the element and
-// shows its design bubble, click copies an ID card locating it in the code.
+// shows its design bubble with spacing rulers, click copies an ID card.
 // Passive by design: it reads the page and writes the clipboard, nothing else.
 (() => {
   'use strict';
@@ -36,6 +36,10 @@
     padding: '16px 20px', borderRadius: '8px',
   });
 
+  // Spacing rulers: one translucent band per space between a container's
+  // direct children, each labeled with the real measured distance.
+  const bands = [];
+
   function mount() {
     if (!box.isConnected) document.documentElement.append(box, bubble);
   }
@@ -52,6 +56,12 @@
   function tagLabel(el) {
     const t = (el.tagName || '').toLowerCase();
     return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+
+  function kindOf(el) {
+    if (IMAGE_TAGS.has(TAG_UP(el))) return 'image';
+    if (hasOwnText(el) || (TEXT_TAGS.has(TAG_UP(el)) && (el.textContent || '').trim())) return 'text';
+    return 'box';
   }
 
   function classesOf(el) {
@@ -139,9 +149,10 @@
     const painted = !isTransparent(bg);
     const bgRow = () => row('Bg ' + (painted ? toHex(bg) : 'none'), painted ? bg : null);
 
-    if (IMAGE_TAGS.has(TAG_UP(el))) {
+    const kind = kindOf(el);
+    if (kind === 'image') {
       row(size);
-    } else if (hasOwnText(el) || (TEXT_TAGS.has(TAG_UP(el)) && (el.textContent || '').trim())) {
+    } else if (kind === 'text') {
       row(fontName(cs.fontFamily));
       row(weightName(cs.fontWeight));
       row(pxLabel(cs.fontSize));
@@ -177,15 +188,70 @@
     bubble.style.left = Math.max(4, Math.min(r.left, innerWidth - bw - 8)) + 'px';
   }
 
+  function clearBands() {
+    for (const b of bands) b.remove();
+    bands.length = 0;
+  }
+
+  function drawBands(el) {
+    clearBands();
+    if (!el || kindOf(el) !== 'box') return;
+    const kids = [...el.children]
+      .filter((c) => c !== box && c !== bubble && !bands.includes(c) &&
+        c.getBoundingClientRect && getComputedStyle(c).display !== 'none')
+      .map((c) => c.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0);
+    for (let i = 0; i < kids.length - 1; i++) {
+      const a = kids[i];
+      const b = kids[i + 1];
+      let geo = null;
+      if (b.top - a.bottom >= 1) {
+        geo = {
+          left: Math.min(a.left, b.left), top: a.bottom,
+          width: Math.max(a.right, b.right) - Math.min(a.left, b.left),
+          height: b.top - a.bottom, gap: b.top - a.bottom,
+        };
+      } else if (b.left - a.right >= 1) {
+        geo = {
+          left: a.right, top: Math.min(a.top, b.top),
+          width: b.left - a.right,
+          height: Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top),
+          gap: b.left - a.right,
+        };
+      }
+      if (!geo) continue; // overlapping or wrapped pair: nothing to measure
+      const d = document.createElement('div');
+      Object.assign(d.style, {
+        position: 'fixed', zIndex: Z, pointerEvents: 'none',
+        left: geo.left + 'px', top: geo.top + 'px',
+        width: geo.width + 'px', height: geo.height + 'px',
+        background: 'rgba(246, 170, 60, 0.30)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      });
+      const chip = document.createElement('span');
+      chip.textContent = String(Math.round(geo.gap));
+      Object.assign(chip.style, {
+        background: BUBBLE_BG, color: '#f3f4f6',
+        font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
+        padding: '1px 7px', borderRadius: '999px',
+      });
+      d.appendChild(chip);
+      document.documentElement.appendChild(d);
+      bands.push(d);
+    }
+  }
+
   function paint() {
     if (!inspecting || !target) { hide(); return; }
     if (!flashTimer) fillBubble(target);
     place();
+    drawBands(target);
   }
 
   function hide() {
     box.style.display = 'none';
     bubble.style.display = 'none';
+    clearBands();
   }
 
   function flash(text, ok) {
@@ -339,8 +405,8 @@
     paint();
   }, true);
 
-  window.addEventListener('scroll', () => { if (inspecting) place(); }, true);
-  window.addEventListener('resize', () => { if (inspecting) place(); }, true);
+  window.addEventListener('scroll', () => { if (inspecting) { place(); drawBands(target); } }, true);
+  window.addEventListener('resize', () => { if (inspecting) { place(); drawBands(target); } }, true);
 
   // While inspecting, the mouse belongs to the picker: nothing reaches the page,
   // so copying a link's card never navigates and a button never fires.
