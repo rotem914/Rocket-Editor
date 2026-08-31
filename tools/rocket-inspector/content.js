@@ -16,7 +16,12 @@
   let flashTimer = 0;      // non-zero while the "copied" flash owns the bubble
 
   const Z = '2147483647';
-  const BUBBLE_BG = '#091243';
+  const BUBBLE_BG = '#1B32AE';
+  const BUBBLE_PAD = '16px 20px';
+  const BUBBLE_RADIUS = '13px';
+  const FLASH_OK = '#0D7737';
+  const FLASH_FAIL = '#7F1D1D';
+  let bubbleDisplay = 'block';   // 'flex' while the copied pill owns the bubble
 
   // ---------- overlay: highlight box + bubble ----------
 
@@ -35,7 +40,7 @@
     direction: 'ltr', textAlign: 'left',
     boxSizing: 'border-box', maxWidth: '320px', background: BUBBLE_BG, color: '#f3f4f6',
     font: "14px/1.6 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
-    padding: '16px 20px', borderRadius: '13px',
+    padding: BUBBLE_PAD, borderRadius: BUBBLE_RADIUS,
   });
 
   // Spacing rulers: one translucent band per space between a container's
@@ -177,6 +182,29 @@
 
   // ---------- placing ----------
 
+  // Entrance: the bubble fades in when it appears, never on the moves after.
+  // Skipped when the machine asks for reduced motion, where it just appears.
+  let fadeAnim = null;
+  let fadeGuard = 0;
+
+  function endFade() {
+    if (fadeGuard) { clearTimeout(fadeGuard); fadeGuard = 0; }
+    if (fadeAnim) {
+      try { fadeAnim.cancel(); } catch (e) { /* already gone */ }
+      fadeAnim = null;
+    }
+  }
+
+  function fadeInBubble() {
+    if (typeof bubble.animate !== 'function') return;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    endFade();
+    fadeAnim = bubble.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 56, easing: 'ease-out' });
+    // A stalled animation clock must never leave the bubble invisible: dropping
+    // the animation restores the element's own full opacity.
+    fadeGuard = setTimeout(endFade, 400);
+  }
+
   function place() {
     if (!target || !target.getBoundingClientRect) { hide(); return; }
     const r = target.getBoundingClientRect();
@@ -185,47 +213,70 @@
       left: r.left + 'px', top: r.top + 'px',
       width: Math.max(0, r.width) + 'px', height: Math.max(0, r.height) + 'px',
     });
-    bubble.style.display = 'block';
+    const wasHidden = bubble.style.display === 'none';
+    bubble.style.display = bubbleDisplay;
+    if (wasHidden) fadeInBubble();
     const bh = bubble.offsetHeight;
     const bw = bubble.offsetWidth;
     const above = outTopEdge !== null ? outTopEdge : r.top;
     const below = outBottomEdge !== null ? outBottomEdge : r.bottom;
+    // Above the element; else below it when that fits on screen; else pinned to
+    // the top, which is where a taller-than-the-window element leaves it.
     let top = above - bh - 8;
-    if (top < 4) top = Math.min(below + 8, innerHeight - bh - 4);
+    if (top < 4) {
+      const under = below + 8;
+      top = (under + bh <= innerHeight - 4) ? under : 4;
+    }
     bubble.style.top = top + 'px';
     // The bubble rides the cursor's X, centered on it, clamped to the viewport.
-    const anchorX = lastX >= 0 ? lastX - bw / 2 : r.left;
-    bubble.style.left = Math.max(4, Math.min(anchorX, innerWidth - bw - 8)) + 'px';
+    // To the cursor's right, so the cursor itself is never covered; flips to
+    // its left only when the right side has no room.
+    let left;
+    if (lastX >= 0) {
+      // the cursor lines up with the text's left edge, not the box's
+      const padLeft = parseFloat(getComputedStyle(bubble).paddingLeft) || 0;
+      left = lastX - padLeft;
+      if (left + bw > innerWidth - 8) left = lastX - bw + padLeft;
+    } else {
+      left = r.left;
+    }
+    bubble.style.left = Math.max(4, Math.min(left, innerWidth - bw - 8)) + 'px';
   }
 
-  const INSIDE_BAND = 'rgba(246, 170, 60, 0.30)';   // spaces between children
-  const OUTSIDE_BAND = 'rgba(37, 99, 235, 0.22)';   // distances from the element outward
+  const INSIDE_BAND = 'rgba(222, 180, 117, 0.32)';  // spaces between children
+  const OUTSIDE_BAND = 'rgba(118, 161, 255, 0.32)'; // distances from the element outward
 
   function clearBands() {
     for (const b of bands) b.remove();
     bands.length = 0;
   }
 
+  // Three layers, bottom to top: band rectangles, then their number pills, then
+  // the bubble and highlight. Pills ride their own layer so a neighbouring
+  // band's wash can never tint or cover a number.
   function addBand(geo, color) {
     const d = document.createElement('div');
     Object.assign(d.style, {
-      // one step under the bubble and highlight, so bands can never cover them
-      position: 'fixed', zIndex: '2147483646', pointerEvents: 'none',
+      position: 'fixed', zIndex: '2147483645', pointerEvents: 'none',
       left: geo.left + 'px', top: geo.top + 'px',
       width: geo.width + 'px', height: geo.height + 'px',
       background: color,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
     });
-    const chip = document.createElement('span');
-    chip.textContent = String(Math.round(geo.gap));
-    Object.assign(chip.style, {
-      background: BUBBLE_BG, color: '#f3f4f6',
-      font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
-      padding: '2px 8px', borderRadius: '999px',
-    });
-    d.appendChild(chip);
     document.documentElement.appendChild(d);
     bands.push(d);
+
+    const chip = document.createElement('div');
+    chip.textContent = String(Math.round(geo.gap));
+    Object.assign(chip.style, {
+      position: 'fixed', zIndex: '2147483646', pointerEvents: 'none',
+      left: (geo.left + geo.width / 2) + 'px', top: (geo.top + geo.height / 2) + 'px',
+      transform: 'translate(-50%, -50%)',
+      background: BUBBLE_BG, color: '#f3f4f6',
+      font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
+      padding: '2px 8px', borderRadius: '999px', whiteSpace: 'nowrap',
+    });
+    document.documentElement.appendChild(chip);
+    bands.push(chip);
   }
 
   function drawBands(el) {
@@ -334,15 +385,51 @@
     clearBands();
   }
 
+  // Built node by node rather than as markup: a site with strict content rules
+  // can refuse markup assignment, and this path never can be refused.
+  function checkIcon() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '20');
+    svg.setAttribute('height', '20');
+    svg.setAttribute('viewBox', '0 0 20 20');
+    svg.setAttribute('fill', 'none');
+    svg.style.flex = '0 0 auto';
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M3 12L7.33 17L16 3');
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '2');
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function resetBubbleChrome() {
+    bubbleDisplay = 'block';
+    Object.assign(bubble.style, {
+      background: BUBBLE_BG, padding: BUBBLE_PAD, borderRadius: BUBBLE_RADIUS,
+      alignItems: '', gap: '',
+    });
+  }
+
+  // Both outcomes wear the same pill, per the Figma design; only the colour
+  // differs, and only the success one carries the check mark.
   function flash(text, ok) {
     if (flashTimer) clearTimeout(flashTimer);
     bubble.textContent = '';
-    row(text);
-    bubble.style.background = ok ? '#14532d' : '#7f1d1d';
+    bubbleDisplay = 'flex';
+    Object.assign(bubble.style, {
+      background: ok ? FLASH_OK : FLASH_FAIL, padding: '16px 32px', borderRadius: '999px',
+      alignItems: 'center', gap: '6px',
+    });
+    if (ok) bubble.appendChild(checkIcon());
+    const label = document.createElement('div');
+    label.textContent = text;
+    label.style.fontWeight = '700';
+    bubble.appendChild(label);
     place();
     flashTimer = setTimeout(() => {
       flashTimer = 0;
-      bubble.style.background = BUBBLE_BG;
+      resetBubbleChrome();
       if (inspecting) paint();
     }, 700);
   }
@@ -366,7 +453,7 @@
     if (flashTimer) {
       clearTimeout(flashTimer);
       flashTimer = 0;
-      bubble.style.background = BUBBLE_BG;
+      resetBubbleChrome();
     }
     hide();
   }
@@ -506,7 +593,7 @@
     const el = e.composedPath ? e.composedPath()[0] : e.target;
     const pick = (el instanceof Element && el !== box && !bubble.contains(el)) ? el : target;
     if (!pick) return;
-    copyText(idCard(pick)).then((ok) => flash(ok ? 'copied ✓' : 'copy failed', ok));
+    copyText(idCard(pick)).then((ok) => flash(ok ? 'Copied' : 'Failed, try again', ok));
   }, true);
 
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
