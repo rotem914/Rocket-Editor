@@ -66,7 +66,7 @@ Rocket Editor/
 │       ├── Figma/
 │       └── Google_analytics/
 └── tools/                 # standalone helper tools, not the app
-    └── class-copy/        # Chrome extension: hover an element, copy its ID card
+    └── rocket-inspector/  # Chrome extension: hover an element, see its design facts, copy its ID card
 ```
 
 ## Data
@@ -97,5 +97,5 @@ anything.
 | Review pack | `notes/Rocket-Editor-Review-Pack-*.md` | Self-contained compression of the whole plan for external AI review, one file per round. |
 | Plan reviews | `notes/Plan-Review-*.md` | Findings from a requested review of the plan docs, one file per pass, awaiting owner verdicts. |
 | Decision verification | `notes/Decision-Verification-*.md` | Research-backed verdicts on the architecture decisions, and the owner questions list. |
-| Helper tools | `tools/class-copy/*` | Rocket Class Copy, a standalone Chrome extension: arm a tab, hold the key left of 1, hover for design facts, click to copy an element ID card for Claude. A helper, not the app; the app rows above stay empty. |
+| Helper tools | `tools/rocket-inspector/*` | Rocket Inspector, a standalone Chrome extension: hold the key left of 1 on any tab, hover for design facts and spacing rulers, click to copy an element ID card for Claude. A helper, not the app; the app rows above stay empty. |
 | Application | none yet | Fill this in with the first real code. |

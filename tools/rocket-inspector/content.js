@@ -1,12 +1,12 @@
-// Rocket Class Copy: content script.
+// Rocket Inspector: content script.
 // Always on; the toolbar icon pauses one tab. Hold the key left of 1 (physical
 // Backquote, layout-independent) to inspect: hover highlights the element and
 // shows its design bubble with spacing rulers, click copies an ID card.
 // Passive by design: it reads the page and writes the clipboard, nothing else.
 (() => {
   'use strict';
-  if (window.__rocketClassCopy) return;
-  window.__rocketClassCopy = true;
+  if (window.__rocketInspector) return;
+  window.__rocketInspector = true;
 
   let armed = true;        // always on (owner's rule); the toolbar icon pauses one tab
   let inspecting = false;  // true while the key is held
@@ -31,14 +31,20 @@
   const bubble = document.createElement('div');
   Object.assign(bubble.style, {
     position: 'fixed', zIndex: Z, pointerEvents: 'none', display: 'none',
+    // pinned LTR: an RTL site must not right-align the rows or flip "#BFBFBF"
+    direction: 'ltr', textAlign: 'left',
     boxSizing: 'border-box', maxWidth: '320px', background: BUBBLE_BG, color: '#f3f4f6',
     font: "14px/1.6 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
-    padding: '16px 20px', borderRadius: '8px',
+    padding: '16px 20px', borderRadius: '13px',
   });
 
   // Spacing rulers: one translucent band per space between a container's
   // direct children, each labeled with the real measured distance.
   const bands = [];
+  // The outward bands directly above and below the element, remembered per
+  // paint so the bubble can clear them instead of covering their pills.
+  let outTopEdge = null;
+  let outBottomEdge = null;
 
   function mount() {
     if (!box.isConnected) document.documentElement.append(box, bubble);
@@ -182,8 +188,10 @@
     bubble.style.display = 'block';
     const bh = bubble.offsetHeight;
     const bw = bubble.offsetWidth;
-    let top = r.top - bh - 8;
-    if (top < 4) top = Math.min(r.bottom + 8, innerHeight - bh - 4);
+    const above = outTopEdge !== null ? outTopEdge : r.top;
+    const below = outBottomEdge !== null ? outBottomEdge : r.bottom;
+    let top = above - bh - 8;
+    if (top < 4) top = Math.min(below + 8, innerHeight - bh - 4);
     bubble.style.top = top + 'px';
     // The bubble rides the cursor's X, centered on it, clamped to the viewport.
     const anchorX = lastX >= 0 ? lastX - bw / 2 : r.left;
@@ -213,7 +221,7 @@
     Object.assign(chip.style, {
       background: BUBBLE_BG, color: '#f3f4f6',
       font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
-      padding: '1px 7px', borderRadius: '999px',
+      padding: '2px 8px', borderRadius: '999px',
     });
     d.appendChild(chip);
     document.documentElement.appendChild(d);
@@ -257,6 +265,8 @@
   // the measuring climb to the next container, so the band always reaches the
   // first edge the eye actually sees.
   function drawOutward(el) {
+    outTopEdge = null;
+    outBottomEdge = null;
     if (!el || el === document.documentElement || el === document.body) return;
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
@@ -272,9 +282,11 @@
     const DIRS = [
       { wall: (p) => p.top, best: Math.max, dist: (e) => r.top - e,
         pick: (s) => (overlapX(s) && s.bottom <= r.top + 0.5) ? s.bottom : null,
+        remember: (e) => { outTopEdge = e; },
         geo: (e) => ({ left: r.left, top: e, width: r.width, height: r.top - e, gap: r.top - e }) },
       { wall: (p) => p.bottom, best: Math.min, dist: (e) => e - r.bottom,
         pick: (s) => (overlapX(s) && s.top >= r.bottom - 0.5) ? s.top : null,
+        remember: (e) => { outBottomEdge = e; },
         geo: (e) => ({ left: r.left, top: r.bottom, width: r.width, height: e - r.bottom, gap: e - r.bottom }) },
       { wall: (p) => p.left, best: Math.max, dist: (e) => r.left - e,
         pick: (s) => (overlapY(s) && s.right <= r.left + 0.5) ? s.right : null,
@@ -300,6 +312,7 @@
         if (touching) break;
         if (dir.dist(edge) >= 3) {
           addBand(dir.geo(edge), OUTSIDE_BAND);
+          if (dir.remember) dir.remember(edge);
           break;
         }
         node = parent; // the wall hugs the element: look one container further out
@@ -310,9 +323,9 @@
   function paint() {
     if (!inspecting || !target) { hide(); return; }
     if (!flashTimer) fillBubble(target);
-    place();
     drawBands(target);
     drawOutward(target);
+    place(); // last, so the bubble can clear the bands it now knows about
   }
 
   function hide() {
@@ -472,8 +485,8 @@
     paint();
   }, true);
 
-  window.addEventListener('scroll', () => { if (inspecting) { place(); drawBands(target); drawOutward(target); } }, true);
-  window.addEventListener('resize', () => { if (inspecting) { place(); drawBands(target); drawOutward(target); } }, true);
+  window.addEventListener('scroll', () => { if (inspecting) { drawBands(target); drawOutward(target); place(); } }, true);
+  window.addEventListener('resize', () => { if (inspecting) { drawBands(target); drawOutward(target); place(); } }, true);
 
   // While inspecting, the mouse belongs to the picker: nothing reaches the page,
   // so copying a link's card never navigates and a button never fires.

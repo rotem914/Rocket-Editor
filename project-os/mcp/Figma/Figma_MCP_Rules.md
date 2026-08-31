@@ -15,9 +15,15 @@ Until then, the rules below still apply the moment a call is made.
 
 | Fact | Value |
 |---|---|
-| Figma file | not set |
-| Target page for generated work | not set |
-| Plan and daily MCP call budget | not set — get the plan's number before the first call |
+| Figma file | `Rocket` — https://www.figma.com/design/UH3fCp8KaMonN0RqCLBFYc/Rocket |
+| Target page for generated work | `Rocket Inspector UI` (page id `2:12`, created 2026-08-31) |
+| Plan and daily MCP call budget | No number stated by Rotem; his own team seat is pro tier. Until he names one, every task keeps the capture-free shape: free capture, one build call, owner-eye verification. |
+
+Known facts learned on the first calls, 2026-08-31: `whoami` works and is free;
+`Google Sans` was invisible until Rotem uploaded it to his account fonts the
+same day, and now serves Regular, Medium and Bold; the extension's UI colors
+live as local paint styles under `Inspector/…` in the file, so palette edits
+happen in Figma's styles panel, not per node.
 
 Push generated pages onto the one target page; never scatter them across the
 file.
@@ -108,6 +114,10 @@ to a credential.
   each leaf's parent chain against the capture too.
 - Pre-flight every `code` string locally: compile it as an async function body
   and count brace balance. A dropped brace is caught free.
+- **`figma.createAutoLayout()` and `figma.createFrame()` are born with a solid
+  WHITE fill.** A container meant to be transparent (a label row, an overlay
+  wrapper) must get `fills = []` explicitly, or it ships as a white box behind
+  its children. Paid for on the Inspector bubble's swatch rows, 2026-08-31.
 - Sanitize captured text: encoding mojibake (an em dash arriving as `â€”`)
   renders verbatim in Figma.
 - `use_figma` returns no value. To read data back,

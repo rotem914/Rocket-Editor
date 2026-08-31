@@ -1,4 +1,4 @@
-// Rocket Class Copy: always on. The toolbar icon PAUSES one tab and resumes it.
+// Rocket Inspector: always on. The toolbar icon PAUSES one tab and resumes it.
 // The per-tab badge is the single source of truth for the paused state, so a
 // restarted service worker can never drift out of sync with what the icon shows.
 chrome.action.onClicked.addListener(async (tab) => {
