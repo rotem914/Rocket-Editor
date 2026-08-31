@@ -3,8 +3,18 @@
   "name": "Rocket Class Copy",
   "version": "1.0.0",
   "description": "Always on: hold the key left of 1 to inspect. Hover shows a design bubble, click copies the element's ID card. The icon pauses one tab.",
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
   "action": {
-    "default_title": "Rocket Class Copy: click to pause or resume this tab"
+    "default_title": "Rocket Class Copy: click to pause or resume this tab",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png"
+    }
   },
   "background": {
     "service_worker": "background.js"

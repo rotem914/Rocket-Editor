@@ -188,9 +188,34 @@
     bubble.style.left = Math.max(4, Math.min(r.left, innerWidth - bw - 8)) + 'px';
   }
 
+  const INSIDE_BAND = 'rgba(246, 170, 60, 0.30)';   // spaces between children
+  const OUTSIDE_BAND = 'rgba(37, 99, 235, 0.22)';   // distances from the element outward
+
   function clearBands() {
     for (const b of bands) b.remove();
     bands.length = 0;
+  }
+
+  function addBand(geo, color) {
+    const d = document.createElement('div');
+    Object.assign(d.style, {
+      // one step under the bubble and highlight, so bands can never cover them
+      position: 'fixed', zIndex: '2147483646', pointerEvents: 'none',
+      left: geo.left + 'px', top: geo.top + 'px',
+      width: geo.width + 'px', height: geo.height + 'px',
+      background: color,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    });
+    const chip = document.createElement('span');
+    chip.textContent = String(Math.round(geo.gap));
+    Object.assign(chip.style, {
+      background: BUBBLE_BG, color: '#f3f4f6',
+      font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
+      padding: '1px 7px', borderRadius: '999px',
+    });
+    d.appendChild(chip);
+    document.documentElement.appendChild(d);
+    bands.push(d);
   }
 
   function drawBands(el) {
@@ -220,24 +245,63 @@
         };
       }
       if (!geo) continue; // overlapping or wrapped pair: nothing to measure
-      const d = document.createElement('div');
-      Object.assign(d.style, {
-        position: 'fixed', zIndex: Z, pointerEvents: 'none',
-        left: geo.left + 'px', top: geo.top + 'px',
-        width: geo.width + 'px', height: geo.height + 'px',
-        background: 'rgba(246, 170, 60, 0.30)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      });
-      const chip = document.createElement('span');
-      chip.textContent = String(Math.round(geo.gap));
-      Object.assign(chip.style, {
-        background: BUBBLE_BG, color: '#f3f4f6',
-        font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
-        padding: '1px 7px', borderRadius: '999px',
-      });
-      d.appendChild(chip);
-      document.documentElement.appendChild(d);
-      bands.push(d);
+      addBand(geo, INSIDE_BAND);
+    }
+  }
+
+  // Distances from the hovered element outward: up, down, left, right, each to
+  // the first thing that direction meets. A touching neighbour means genuinely
+  // zero and stays silent; a container wall that merely hugs the element makes
+  // the measuring climb to the next container, so the band always reaches the
+  // first edge the eye actually sees.
+  function drawOutward(el) {
+    if (!el || el === document.documentElement || el === document.body) return;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    const bandSet = new Set(bands);
+    const rectsAround = (node) => [...node.parentElement.children]
+      .filter((c) => c !== node && c !== box && c !== bubble && !bandSet.has(c) &&
+        getComputedStyle(c).display !== 'none')
+      .map((c) => c.getBoundingClientRect())
+      .filter((s) => s.width > 0 && s.height > 0);
+    const overlapX = (s) => Math.min(s.right, r.right) > Math.max(s.left, r.left);
+    const overlapY = (s) => Math.min(s.bottom, r.bottom) > Math.max(s.top, r.top);
+
+    const DIRS = [
+      { wall: (p) => p.top, best: Math.max, dist: (e) => r.top - e,
+        pick: (s) => (overlapX(s) && s.bottom <= r.top + 0.5) ? s.bottom : null,
+        geo: (e) => ({ left: r.left, top: e, width: r.width, height: r.top - e, gap: r.top - e }) },
+      { wall: (p) => p.bottom, best: Math.min, dist: (e) => e - r.bottom,
+        pick: (s) => (overlapX(s) && s.top >= r.bottom - 0.5) ? s.top : null,
+        geo: (e) => ({ left: r.left, top: r.bottom, width: r.width, height: e - r.bottom, gap: e - r.bottom }) },
+      { wall: (p) => p.left, best: Math.max, dist: (e) => r.left - e,
+        pick: (s) => (overlapY(s) && s.right <= r.left + 0.5) ? s.right : null,
+        geo: (e) => ({ left: e, top: r.top, width: r.left - e, height: r.height, gap: r.left - e }) },
+      { wall: (p) => p.right, best: Math.min, dist: (e) => e - r.right,
+        pick: (s) => (overlapY(s) && s.left >= r.right - 0.5) ? s.left : null,
+        geo: (e) => ({ left: r.right, top: r.top, width: e - r.right, height: r.height, gap: e - r.right }) },
+    ];
+
+    for (const dir of DIRS) {
+      let node = el;
+      for (let climb = 0; climb < 6; climb++) {
+        const parent = node.parentElement;
+        if (!parent || parent === document.documentElement) break;
+        let edge = dir.wall(parent.getBoundingClientRect());
+        let touching = false;
+        for (const s of rectsAround(node)) {
+          const cand = dir.pick(s);
+          if (cand === null) continue;
+          if (dir.dist(cand) < 3) { touching = true; break; }
+          edge = dir.best(edge, cand);
+        }
+        if (touching) break;
+        if (dir.dist(edge) >= 3) {
+          addBand(dir.geo(edge), OUTSIDE_BAND);
+          break;
+        }
+        node = parent; // the wall hugs the element: look one container further out
+      }
     }
   }
 
@@ -246,6 +310,7 @@
     if (!flashTimer) fillBubble(target);
     place();
     drawBands(target);
+    drawOutward(target);
   }
 
   function hide() {
@@ -405,8 +470,8 @@
     paint();
   }, true);
 
-  window.addEventListener('scroll', () => { if (inspecting) { place(); drawBands(target); } }, true);
-  window.addEventListener('resize', () => { if (inspecting) { place(); drawBands(target); } }, true);
+  window.addEventListener('scroll', () => { if (inspecting) { place(); drawBands(target); drawOutward(target); } }, true);
+  window.addEventListener('resize', () => { if (inspecting) { place(); drawBands(target); drawOutward(target); } }, true);
 
   // While inspecting, the mouse belongs to the picker: nothing reaches the page,
   // so copying a link's card never navigates and a button never fires.
