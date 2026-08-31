@@ -185,7 +185,9 @@
     let top = r.top - bh - 8;
     if (top < 4) top = Math.min(r.bottom + 8, innerHeight - bh - 4);
     bubble.style.top = top + 'px';
-    bubble.style.left = Math.max(4, Math.min(r.left, innerWidth - bw - 8)) + 'px';
+    // The bubble rides the cursor's X, centered on it, clamped to the viewport.
+    const anchorX = lastX >= 0 ? lastX - bw / 2 : r.left;
+    bubble.style.left = Math.max(4, Math.min(anchorX, innerWidth - bw - 8)) + 'px';
   }
 
   const INSIDE_BAND = 'rgba(246, 170, 60, 0.30)';   // spaces between children
@@ -402,7 +404,7 @@
     }
 
     const lines = [
-      'page:    ' + location.pathname,
+      'page:    ' + location.pathname + location.search + location.hash,
       'element: ' + (el.tagName || '').toLowerCase() + (words ? ' · "' + words + '"' : ''),
       'classes: ' + (cls || '(none)'),
     ];
