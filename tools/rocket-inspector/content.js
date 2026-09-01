@@ -119,6 +119,24 @@
     return (Number.isInteger(n) ? n : Math.round(n * 10) / 10) + 'px';
   }
 
+  // Corner radius: one number when all four match, per-corner letters when they
+  // differ, and null when there is none at all, which drops the row entirely.
+  function cornerLabel(cs) {
+    const one = (p) => {
+      const v = String(cs[p]).split(' ')[0];
+      if (v.endsWith('%')) return v;
+      return Math.round(parseFloat(v) || 0);
+    };
+    const vals = [
+      ['TL', one('borderTopLeftRadius')], ['TR', one('borderTopRightRadius')],
+      ['BR', one('borderBottomRightRadius')], ['BL', one('borderBottomLeftRadius')],
+    ];
+    const isZero = (v) => v === 0 || v === '0%';
+    if (vals.every(([, v]) => isZero(v))) return null;
+    if (vals.every(([, v]) => String(v) === String(vals[0][1]))) return 'Radius ' + vals[0][1];
+    return 'Radius ' + vals.filter(([, v]) => !isZero(v)).map(([c, v]) => c + v).join(' ');
+  }
+
   // Sides in the owner's order, L R T B. A zero side is omitted; all-zero -> "0".
   function sidesLabel(cs, prop) {
     const read = (side) => Math.round(parseFloat(cs[prop + side]) || 0);
@@ -178,6 +196,8 @@
       row('Margin ' + sidesLabel(cs, 'margin'));
       row('Padding ' + sidesLabel(cs, 'padding'));
     }
+    const corners = cornerLabel(cs);
+    if (corners) row(corners);
   }
 
   // ---------- placing ----------
@@ -486,6 +506,59 @@
     return n + 'th';
   }
 
+  // The element's source location, when the dev build stamped one: Lovable's
+  // tagger attributes first, then generic inspector attributes, then React's
+  // debug source on the fiber (dev builds before React 19). Walks a few
+  // ancestors and says so when the stamp came from one. Null means unknown,
+  // and unknown is never guessed.
+  function sourceOf(el) {
+    let node = el;
+    for (let i = 0; node && i < 4; i++) {
+      if (node.getAttribute) {
+        const path = node.getAttribute('data-component-path');
+        if (path) {
+          const line = node.getAttribute('data-component-line');
+          return path + (line ? ':' + line : '') + (node === el ? '' : ' (parent)');
+        }
+        const direct = node.getAttribute('data-lov-id') ||
+          node.getAttribute('data-source') || node.getAttribute('data-inspector-location');
+        if (direct) return direct + (node === el ? '' : ' (parent)');
+      }
+      for (const k in node) {
+        if (k.indexOf('__reactFiber$') !== 0) continue;
+        let f = node[k];
+        for (let d = 0; f && d < 3; d++) {
+          const s = f._debugSource;
+          if (s && s.fileName) {
+            const norm = String(s.fileName).replace(/\\/g, '/');
+            const short = norm.indexOf('/src/') >= 0 ? 'src/' + norm.split('/src/').pop() : norm;
+            return short + (s.lineNumber ? ':' + s.lineNumber : '') + (node === el ? '' : ' (parent)');
+          }
+          f = f.return;
+        }
+        break;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  // Light or dark by what the page actually painted, never by the browser's
+  // preference: a site with no dark mode renders light under a dark OS, and
+  // the executor needs the truth the owner's eyes saw.
+  function pageTheme() {
+    const bgOf = (el) => {
+      const c = getComputedStyle(el).backgroundColor;
+      return isTransparent(c) ? null : c;
+    };
+    const c = bgOf(document.body) || bgOf(document.documentElement);
+    if (!c) return 'light';
+    const m = /rgba?\(([^)]+)\)/.exec(c);
+    if (!m) return 'light';
+    const p = m[1].split(',').map(parseFloat);
+    return (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) < 128 ? 'dark' : 'light';
+  }
+
   function idCard(el) {
     const cls = classesOf(el);
     const words = ownWords(el, 8);
@@ -511,6 +584,22 @@
     if (chain.length || pos) {
       lines.push('inside:  ' + (chain.join(' > ') || '(page root)') + pos);
     }
+    if (el.getBoundingClientRect) {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      lines.push('box:     ' + Math.round(r.width) + ' × ' + Math.round(r.height) +
+        ' · margin ' + sidesLabel(cs, 'margin') + ' · padding ' + sidesLabel(cs, 'padding'));
+    }
+    const src = sourceOf(el);
+    if (src) lines.push('file:    ' + src);
+    const handles = [];
+    if (el.id) handles.push('id=' + el.id);
+    for (const a of ['data-testid', 'data-test', 'aria-label', 'name', 'role']) {
+      const v = el.getAttribute && el.getAttribute(a);
+      if (v) handles.push(a + '=' + v);
+    }
+    if (handles.length) lines.push('attrs:   ' + handles.join(' · '));
+    lines.push('view:    ' + innerWidth + ' × ' + innerHeight + ' · ' + pageTheme());
     return lines.join('\n');
   }
 
