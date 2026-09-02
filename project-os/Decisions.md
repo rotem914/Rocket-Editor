@@ -69,6 +69,7 @@ task touches. A line in _italics_ means part of that entry no longer holds.
 - 2026-08-30: The unit of handoff is a small group of related changes, sent mid-session; the full report is history
 - 2026-08-30: The control list grows to fifteen: font weight, letter spacing, border width and shadow join
 - 2026-08-31: The class-copy extension copies an element ID card, not the bare class
+- 2026-09-03: The bubble reads in four fixed groups, with no headers
 
 ---
 
@@ -919,3 +920,44 @@ data, matching the standing rule from the lean plan reviews.
 
 Revisit if real use shows the card too noisy to paste, or still missing
 elements, which would argue for adding stable ids or data attributes to it.
+
+---
+
+## 2026-09-03: The bubble reads in four fixed groups, with no headers
+
+### Context
+
+The bubble had grown to a dozen rows, printed in one unbroken column. Everything
+in it is true and useful, and none of it was findable at a glance: the eye had to
+read the labels to know where it was. The tool is about to go out to people who
+did not build it, so the reading order had to become learnable.
+
+### Options
+
+1. Blank line between groups, no headers.
+2. The same groups, each with a small caption in the footer blue.
+3. Compress type the way a typographer writes it, `34/41` for size over line
+   height, alongside either of the above.
+4. Two columns, labels left, values aligned in a second column.
+
+### Decision
+
+Option 1, explicitly without option 3. Rotem, 2026-09-03, choosing from four
+sketches. The order is fixed and never varies: what it is, how it reads, how it
+sits, how it looks. Group captions were rejected as a row of reading for a
+grouping the gap already shows; the `34/41` notation was rejected as designer
+shorthand a wider audience does not share.
+
+### Consequences
+
+Rows are collected, and a group boundary marks the next row that actually
+prints, so a group with nothing to say leaves no gap behind and two boundaries
+never double up. That is what lets zero-value rows disappear, which landed in
+the same session: an element with no padding simply has a shorter bubble, and
+the layout never shows a hole where a row used to be.
+
+The order is now a contract. A new fact does not go at the end; it goes in the
+group it belongs to, or it needs a fifth group and this entry gets a successor.
+
+Revisit if the tool ships to people who read it cold and cannot tell the groups
+apart, which is the case option 2 was written for.

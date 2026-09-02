@@ -14,6 +14,7 @@
   let lastX = -1;
   let lastY = -1;
   let flashTimer = 0;      // non-zero while the "copied" flash owns the bubble
+  let flashGen = 0;        // every swap claims one; an overtaken swap bows out
   let settleTimer = 0;     // waiting for the cursor to settle on a new element
 
   const Z = '2147483647';
@@ -22,13 +23,16 @@
   const BUBBLE_RADIUS = '13px';
   const FLASH_OK = '#0D7737';
   const FLASH_FAIL = '#7F1D1D';
-  let bubbleDisplay = 'block';   // 'flex' while the copied pill owns the bubble
+  const FOOTER_COLOR = '#97A1D7';
+  const GROUP_GAP = '8px';   // the breath between one group of rows and the next
+  let bubbleDisplay = 'block';   // 'flex' while the confirmation panel owns the bubble
 
   // ---------- overlay: highlight box + bubble ----------
 
   const box = document.createElement('div');
   Object.assign(box.style, {
-    position: 'fixed', zIndex: Z, pointerEvents: 'none', display: 'none',
+    // under the bands and their pills: the blue outline must never cross a number
+    position: 'fixed', zIndex: '2147483644', pointerEvents: 'none', display: 'none',
     background: 'rgba(37, 99, 235, 0.10)',
     outline: '2px solid rgba(37, 99, 235, 0.85)',
     outlineOffset: '-1px',
@@ -43,6 +47,11 @@
     font: "14px/1.6 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
     padding: BUBBLE_PAD, borderRadius: BUBBLE_RADIUS,
   });
+
+  // The rows live one layer in, so a swap can fade and move all of them
+  // together while the bubble itself stays exactly where it is.
+  const content = document.createElement('div');
+  bubble.appendChild(content);
 
   // Spacing rulers: one translucent band per space between a container's
   // direct children, each labeled with the real measured distance.
@@ -331,6 +340,12 @@
     return shown.length > 120 ? shown.slice(0, 120) + '…' : shown;
   }
 
+  function fineLabel(v) {
+    const n = parseFloat(v);
+    if (Number.isNaN(n)) return String(v);
+    return (Math.round(n * 100) / 100) + 'px';
+  }
+
   // Sides in the owner's order, L R T B. A zero side is omitted; all-zero -> "0".
   function sidesLabel(cs, prop) {
     const read = (side) => Math.round(parseFloat(cs[prop + side]) || 0);
@@ -357,23 +372,36 @@
   // Rows are collected first and only drawn when they differ from what is
   // already on screen: rebuilding on every mouse move made the numbers flicker.
   let pendingRows = [];
+  let pendingGap = false;
   let drawnSignature = '';
 
-  function row(text, swatch, base) {
-    pendingRows.push({ text: text, swatch: swatch, base: base });
+  function row(text, swatch, base, style) {
+    if (pendingGap) {
+      // the row's own styling still wins, so the footer keeps its own margin
+      style = Object.assign({ marginTop: GROUP_GAP }, style || {});
+      pendingGap = false;
+    }
+    pendingRows.push({ text: text, swatch: swatch, base: base, style: style });
+  }
+
+  // A breath between groups. It waits for the next row that really prints, so
+  // an empty group leaves no gap behind and two in a row never double up.
+  function gap() {
+    if (pendingRows.length) pendingGap = true;
   }
 
   function drawRows() {
     const signature = pendingRows.map((r) => r.text + '|' + (r.swatch || '')).join('\n');
     if (signature === drawnSignature) { pendingRows = []; return; }
     drawnSignature = signature;
-    bubble.textContent = '';
+    content.textContent = '';
     for (const r of pendingRows) {
       const div = document.createElement('div');
       div.textContent = r.text; // page data stays text, never markup
       Object.assign(div.style, {
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       });
+      if (r.style) Object.assign(div.style, r.style);
       if (r.swatch) {
         const s = document.createElement('span');
         Object.assign(s.style, {
@@ -385,13 +413,21 @@
         });
         div.appendChild(s);
       }
-      bubble.appendChild(div);
+      content.appendChild(div);
     }
     pendingRows = [];
   }
 
+  // Values in the bubble read like words a designer writes: Full, Normal, None.
+  // Only whole lowercase words are lifted, so hex, units and CSS functions such
+  // as linear-gradient() stay exactly as the browser wrote them. The copied
+  // card never passes through here: its reader needs valid CSS.
+  const capWords = (v) => v.replace(/(^|[\s,·\/])([a-z]+)(?=$|[\s,·\/])/g,
+    (m, pre, w) => pre + w.charAt(0).toUpperCase() + w.slice(1));
+
   function fillBubble(el) {
     pendingRows = [];
+    pendingGap = false;
     const cls = classesOf(el);
     row(tagLabel(el) + ' · ' + (cls || '(no class)'));
 
@@ -403,35 +439,49 @@
     // a see-through colour is shown over what the page really has behind it
     const behindEl = backdropOf(el.parentElement || el);
     const behindText = backdropOf(el);
-    const bgRow = () => row('Bg ' + (painted ? toHex(bg) : 'none'), painted ? bg : null, behindEl);
+    const bgRow = () => row('Bg: ' + (painted ? capWords(toHex(bg)) : 'None'), painted ? bg : null, behindEl);
+    // a zero side is not news: the row appears only when there is spacing
+    const spacingRow = (label, prop) => {
+      const v = sidesLabel(cs, prop);
+      if (v !== '0') row(label + ': ' + v);
+    };
 
+    // Four groups, always in this order, separated by a breath: what it is,
+    // how it reads, how it sits, how it looks. An empty group disappears.
     const kind = kindOf(el);
-    if (kind === 'image') {
-      row(size);
-    } else if (kind === 'text') {
+    let showBg = kind !== 'image';
+
+    if (kind === 'text') {
       // the style of the words on screen, which on a wrapper lives in a child
       const t = textStyleSource(el);
       const tcs = t === el ? cs : getComputedStyle(t);
+      gap();
       row(fontName(tcs.fontFamily));
-      row(weightName(tcs.fontWeight));
-      row(pxLabel(tcs.fontSize));
-      row(toHex(tcs.color), tcs.color, behindText);
+      row(weightName(tcs.fontWeight) + ', ' + pxLabel(tcs.fontSize));
+      row('L-H: ' + capWords(pxLabel(tcs.lineHeight)));
+      if (tcs.letterSpacing && tcs.letterSpacing !== 'normal') {
+        row('L-S: ' + fineLabel(tcs.letterSpacing));
+      }
+      row('Text: ' + capWords(toHex(tcs.color)), tcs.color, behindText);
       // A button or link always owns its Bg row; other text shows one only
       // when it actually paints a background.
-      if (painted || TAG_UP(el) === 'BUTTON' || TAG_UP(el) === 'A') bgRow();
-      row('Padding ' + sidesLabel(cs, 'padding'));
-    } else {
-      row(size);
-      bgRow();
-      row('Margin ' + sidesLabel(cs, 'margin'));
-      row('Padding ' + sidesLabel(cs, 'padding'));
+      showBg = painted || TAG_UP(el) === 'BUTTON' || TAG_UP(el) === 'A';
     }
+
+    gap();
+    if (kind !== 'text') row(size);
+    if (kind === 'box') spacingRow('Margin', 'margin');
+    if (kind !== 'image') spacingRow('Padding', 'padding');
+
+    gap();
+    if (showBg) bgRow();
     const corners = cornerLabel(cs, el);
-    if (corners) row(corners);
+    if (corners) row(capWords(corners.replace(/^Radius /, 'Radius: ')));
     const border = borderLabel(cs, el);
-    if (border) row('Border ' + border);
+    if (border) row('Border: ' + capWords(border));
     const shadow = shadowLabel(cs);
-    if (shadow) row('Shadow ' + shadow);
+    if (shadow) row('Shadow: ' + capWords(shadow));
+    row('Click to copy for your agent', null, null, { marginTop: '8px', color: FOOTER_COLOR });
     drawRows();
   }
 
@@ -450,9 +500,11 @@
     }
   }
 
+  const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   function fadeInBubble() {
     if (typeof bubble.animate !== 'function') return;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (reducedMotion()) return;
     endFade();
     fadeAnim = bubble.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 56, easing: 'ease-out' });
     // A stalled animation clock must never leave the bubble invisible: dropping
@@ -638,7 +690,25 @@
     box.style.display = 'none';
     bubble.style.display = 'none';
     drawnSignature = '';
+    unlockBubbleSize();
     clearBands();
+  }
+
+  // The confirmation panel wears the bubble the element's facts were wearing:
+  // the box is pinned just before the swap and released when the facts come
+  // back, so the bubble never resizes or moves under the cursor mid-copy.
+  // Minimums, not fixed sizes, so a panel taller than a short bubble grows it
+  // rather than spilling outside the rounded background.
+  function lockBubbleSize() {
+    if (bubble.style.minHeight) return;          // a flash already holds the box
+    if (bubble.style.display === 'none') return; // nothing measurable to keep
+    bubble.style.minWidth = bubble.offsetWidth + 'px';
+    bubble.style.minHeight = bubble.offsetHeight + 'px';
+  }
+
+  function unlockBubbleSize() {
+    bubble.style.minWidth = '';
+    bubble.style.minHeight = '';
   }
 
   // Built node by node rather than as markup: a site with strict content rules
@@ -659,36 +729,134 @@
     return svg;
   }
 
+  // The check mark from the design: a white ring with a white tick inside it.
+  function checkDisc() {
+    const disc = document.createElement('div');
+    Object.assign(disc.style, {
+      width: '36px', height: '36px', borderRadius: '999px',
+      border: '2px solid #FFFFFF', boxSizing: 'border-box',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto',
+    });
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('width', '36');
+    svg.setAttribute('height', '36');
+    svg.setAttribute('viewBox', '0 0 36 36');
+    svg.setAttribute('fill', 'none');
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', 'M11.25 20.25L16.5 25.88L24.75 10.69');
+    path.setAttribute('stroke', '#FFFFFF');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linecap', 'round');
+    svg.appendChild(path);
+    disc.appendChild(svg);
+    return disc;
+  }
+
+  function copiedPanel(ok) {
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+    });
+    if (ok) wrap.appendChild(checkDisc());
+    const title = document.createElement('div');
+    title.textContent = ok ? 'Specs copied!' : 'Failed, try again';
+    Object.assign(title.style, {
+      marginTop: ok ? '10px' : '0', fontSize: '16px', fontWeight: '500', color: '#FFFFFF',
+    });
+    wrap.appendChild(title);
+    if (ok) {
+      const sub = document.createElement('div');
+      sub.textContent = 'Paste it to your agent';
+      Object.assign(sub.style, { marginTop: '0', fontSize: '14px', color: '#BFC5E7' });
+      wrap.appendChild(sub);
+    }
+    return wrap;
+  }
+
+  // Out: down 8px while fading, ease-in. In: up 8px while fading, ease-out.
+  // Both 144ms, and the content is never left invisible if the clock stalls.
+  const SWAP_MS = 144;
+
+  function swapContent(build) {
+    let settled = false;
+    let fadeOut = null;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      if (fadeOut) { try { fadeOut.cancel(); } catch (e) { /* already gone */ } }
+      // a build that says false has been overtaken: the bubble is not ours to touch
+      if (build() === false) return;
+      place();
+      if (typeof content.animate === 'function' && !reducedMotion()) {
+        const rise = content.animate(
+          [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: SWAP_MS, easing: 'ease-out' }
+        );
+        // same guard as the fade-out: a stalled clock must not strand the
+        // content at the rise's first frame, which is invisible.
+        setTimeout(() => { try { rise.cancel(); } catch (e) { /* already gone */ } }, SWAP_MS + 300);
+      }
+    };
+    if (typeof content.animate !== 'function' || reducedMotion()) { finish(); return; }
+    fadeOut = content.animate(
+      [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(8px)' }],
+      { duration: SWAP_MS, easing: 'ease-in', fill: 'forwards' }
+    );
+    fadeOut.onfinish = finish;
+    setTimeout(finish, SWAP_MS + 300);
+  }
+
   function resetBubbleChrome() {
     bubbleDisplay = 'block';
     Object.assign(bubble.style, {
       background: BUBBLE_BG, padding: BUBBLE_PAD, borderRadius: BUBBLE_RADIUS,
-      alignItems: '', gap: '',
+      alignItems: '', justifyContent: '', gap: '',
     });
   }
 
-  // Both outcomes wear the same pill, per the Figma design; only the colour
-  // differs, and only the success one carries the check mark.
-  function flash(text, ok) {
-    if (flashTimer) clearTimeout(flashTimer);
-    bubble.textContent = '';
-    drawnSignature = ''; // the flash owns the bubble; the next hover redraws
-    bubbleDisplay = 'flex';
-    Object.assign(bubble.style, {
-      background: ok ? FLASH_OK : FLASH_FAIL, padding: '16px 32px', borderRadius: '999px',
-      alignItems: 'center', gap: '6px',
-    });
-    if (ok) bubble.appendChild(checkIcon());
-    const label = document.createElement('div');
-    label.textContent = text;
-    label.style.fontWeight = '700';
-    bubble.appendChild(label);
-    place();
-    flashTimer = setTimeout(() => {
+  // Back from the confirmation to the element's facts, the same swap in reverse.
+  function restoreFacts() {
+    const gen = ++flashGen;
+    flashTimer = -1; // the swap owns the bubble until the facts land
+    swapContent(() => {
+      if (gen !== flashGen) return false; // a newer click, or the key was released
       flashTimer = 0;
+      drawnSignature = '';
       resetBubbleChrome();
-      if (inspecting) paint();
-    }, 700);
+      unlockBubbleSize();
+      if (inspecting && target) fillBubble(target);
+      else content.textContent = '';
+    });
+    if (!inspecting) hide();
+  }
+
+  // Moving to another element ends the confirmation early: the facts he is
+  // looking at now beat the message about the one he just left.
+  function endFlash() {
+    if (flashTimer > 0) {
+      clearTimeout(flashTimer);
+      restoreFacts();
+    }
+  }
+
+  // Both outcomes wear the same panel; only the words differ, and only the
+  // success one carries the ring and its tick.
+  function flash(ok) {
+    if (flashTimer && flashTimer > 0) clearTimeout(flashTimer);
+    const gen = ++flashGen;
+    flashTimer = -1; // the panel owns the bubble from this instant, not from the swap
+    lockBubbleSize();
+    swapContent(() => {
+      if (gen !== flashGen) return false; // a newer click, or the key was released
+      drawnSignature = '';
+      content.textContent = '';
+      content.appendChild(copiedPanel(ok));
+      // the panel is centred in the box the facts left behind, both ways
+      bubbleDisplay = 'flex';
+      Object.assign(bubble.style, { alignItems: 'center', justifyContent: 'center' });
+      flashTimer = setTimeout(restoreFacts, 2400);
+    });
   }
 
   // ---------- mode ----------
@@ -709,8 +877,9 @@
     target = null;
     if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; }
     if (flashTimer) {
-      clearTimeout(flashTimer);
+      if (flashTimer > 0) clearTimeout(flashTimer);
       flashTimer = 0;
+      flashGen++;   // a swap still in the air must not put a panel in an empty bubble
       resetBubbleChrome();
     }
     hide();
@@ -821,6 +990,71 @@
     return (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) < 128 ? 'dark' : 'light';
   }
 
+  // React 19 removed the source location from its fibers, so a modern dev build
+  // has no file to give. The component NAME is still there, and it names the
+  // file to open. Walks a few ancestors, marked when it came from one.
+  function componentOf(el) {
+    const nameOf = (type) => {
+      if (!type) return '';
+      if (typeof type === 'string') return '';          // a plain host element
+      if (type.displayName) return String(type.displayName);
+      if (type.name) return String(type.name);
+      if (type.render) return nameOf(type.render);      // forwardRef
+      if (type.type) return nameOf(type.type);          // memo
+      return '';
+    };
+    let node = el;
+    for (let up = 0; node && up < 4; up++) {
+      for (const k in node) {
+        if (k.indexOf('__reactFiber$') !== 0 && k.indexOf('__reactInternalInstance$') !== 0) continue;
+        let f = node[k];
+        for (let d = 0; f && d < 12; d++) {
+          const name = nameOf(f.elementType || f.type);
+          if (name && name.length < 60 && /^[A-Z]/.test(name)) {
+            return name + (node === el ? '' : ' (parent)');
+          }
+          f = f.return;
+        }
+        break;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  // How the element arranges its children, when it arranges them at all. The
+  // classes only half-say this on Tailwind and say nothing on other stacks.
+  function layoutOf(cs) {
+    const d = cs.display;
+    if (d !== 'flex' && d !== 'inline-flex' && d !== 'grid' && d !== 'inline-grid') return null;
+    const parts = [];
+    const isGrid = d.indexOf('grid') >= 0;
+    if (isGrid) {
+      parts.push(d);
+      const cols = cs.gridTemplateColumns;
+      if (cols && cols !== 'none' && cols !== 'subgrid') {
+        // line names travel in brackets and are not tracks: [full-start] 100px …
+        const tracks = cols.replace(/\[[^\]]*\]/g, ' ').trim().split(/\s+/).filter(Boolean);
+        if (tracks.length) {
+          const even = tracks.every((t) => t === tracks[0]);
+          parts.push(even ? tracks.length + ' cols ' + tracks[0] : 'cols ' + tracks.join(', '));
+        }
+      }
+    } else {
+      const dir = cs.flexDirection;
+      parts.push(d + ' ' + dir);
+      if (cs.flexWrap && cs.flexWrap !== 'nowrap') parts.push(cs.flexWrap);
+    }
+    const gapRow = Math.round(parseFloat(cs.rowGap) || 0);
+    const gapCol = Math.round(parseFloat(cs.columnGap) || 0);
+    if (gapRow || gapCol) {
+      parts.push('gap ' + (gapRow === gapCol ? gapRow + 'px' : gapRow + 'px/' + gapCol + 'px'));
+    }
+    if (cs.alignItems && cs.alignItems !== 'normal') parts.push('items ' + cs.alignItems);
+    if (cs.justifyContent && cs.justifyContent !== 'normal') parts.push('justify ' + cs.justifyContent);
+    return parts.join(', ');
+  }
+
   function idCard(el) {
     const cls = classesOf(el);
     const words = ownWords(el, 8);
@@ -857,18 +1091,35 @@
       if (border) lines.push('border:  ' + border);
       const shadow = shadowLabel(cs, cssColor);
       if (shadow) lines.push('shadow:  ' + shadow);
+      const layout = layoutOf(cs);
+      if (layout) lines.push('layout:  ' + layout);
+      const p = el.parentElement;
+      if (p && p !== document.body && p !== document.documentElement && p.getBoundingClientRect) {
+        const pr = p.getBoundingClientRect();
+        const pcs = getComputedStyle(p);
+        const pl = layoutOf(pcs);
+        lines.push('parent:  ' + nameOf(p) + ' ' + Math.round(pr.width) + ' × ' + Math.round(pr.height) +
+          ' · padding ' + sidesLabel(pcs, 'padding') + (pl ? ' · ' + pl : ''));
+      }
       if (kindOf(el) === 'text') {
         const t = textStyleSource(el);
         const tcs = t === el ? cs : getComputedStyle(t);
-        lines.push('type:    ' + fontName(tcs.fontFamily) + ', ' + weightName(tcs.fontWeight) +
-          ', ' + pxLabel(tcs.fontSize) + ', ' + cssColor(tcs.color));
+        const type = [fontName(tcs.fontFamily), weightName(tcs.fontWeight), pxLabel(tcs.fontSize),
+          'line-height ' + pxLabel(tcs.lineHeight)];
+        if (tcs.letterSpacing && tcs.letterSpacing !== 'normal') {
+          type.push('letter-spacing ' + fineLabel(tcs.letterSpacing));
+        }
+        type.push(cssColor(tcs.color));
+        lines.push('type:    ' + type.join(', '));
       }
     }
-    const src = sourceOf(el);
-    if (src) lines.push('file:    ' + src);
-    // one field per line is the card's contract: no attribute value may carry a
-    // newline into it, and none may run away in length
+    // one field per line is the card's contract: no page-written value may carry
+    // a newline into it, and none may run away in length
     const flat = (v) => String(v).replace(/\s+/g, ' ').trim().slice(0, 120);
+    const src = sourceOf(el);
+    if (src) lines.push('file:    ' + flat(src));
+    const comp = componentOf(el);
+    if (comp) lines.push('comp:    ' + flat(comp));
     const handles = [];
     if (el.id) handles.push('id=' + flat(el.id));
     for (const a of ['data-testid', 'data-test', 'aria-label', 'name', 'role']) {
@@ -943,6 +1194,7 @@
     settleTimer = setTimeout(() => {
       settleTimer = 0;
       target = el;
+      endFlash();
       paint();
     }, SETTLE_MS);
   }
@@ -979,7 +1231,7 @@
     const el = e.composedPath ? e.composedPath()[0] : e.target;
     const pick = (el instanceof Element && el !== box && !bubble.contains(el)) ? el : target;
     if (!pick) return;
-    copyText(idCard(pick)).then((ok) => flash(ok ? 'Copied' : 'Failed, try again', ok));
+    copyText(idCard(pick)).then((ok) => flash(ok));
   }, true);
 
   if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.onMessage) {
