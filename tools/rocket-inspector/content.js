@@ -14,6 +14,7 @@
   let lastX = -1;
   let lastY = -1;
   let flashTimer = 0;      // non-zero while the "copied" flash owns the bubble
+  let settleTimer = 0;     // waiting for the cursor to settle on a new element
 
   const Z = '2147483647';
   const BUBBLE_BG = '#1B32AE';
@@ -62,10 +63,13 @@
   // e.g. <button><span>Save</span></button>.
   const TEXT_TAGS = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'P', 'A', 'BUTTON', 'LABEL', 'SPAN', 'LI']);
   const TAG_UP = (el) => (el.tagName || '').toUpperCase();
+  // localName keeps SVG's real spelling: foreignObject, not foreignobject,
+  // which is the form a search of the source has to match.
+  const tagName = (el) => el.localName || (el.tagName || '').toLowerCase();
 
   // h2 -> H2, div -> Div, img -> Img: first letter capitalized, per spec.
   function tagLabel(el) {
-    const t = (el.tagName || '').toLowerCase();
+    const t = tagName(el);
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
@@ -87,17 +91,107 @@
     return false;
   }
 
-  function toHex(color) {
-    const m = /^rgba?\(([^)]+)\)$/.exec(color);
-    if (!m) return color;
-    const p = m[1].split(',').map((s) => parseFloat(s));
-    if (p.length > 3 && p[3] < 1) return color; // real transparency stays readable
-    const hex = (n) => Math.round(n).toString(16).padStart(2, '0');
-    return ('#' + hex(p[0]) + hex(p[1]) + hex(p[2])).toUpperCase();
+  const NON_VISIBLE_TEXT = new Set(['SCRIPT', 'STYLE', 'TEMPLATE', 'NOSCRIPT']);
+
+  // Text a person cannot see: markup that never renders, and the screen-reader
+  // only labels Tailwind sites clip to a single pixel off-screen.
+  function isHiddenText(el) {
+    if (!el || NON_VISIBLE_TEXT.has(TAG_UP(el))) return true;
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) return true;
+    const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    return !!r && r.width <= 1 && r.height <= 1;
   }
 
-  const isTransparent = (c) =>
-    !c || c === 'transparent' || /^rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0(\.0+)?\s*\)$/.test(c);
+  // The element whose computed style describes the words a person actually
+  // sees: itself when it holds its own text, otherwise its first text-bearing
+  // descendant, because a wrapper's inherited font is not what got painted.
+  function textStyleSource(el) {
+    if (hasOwnText(el)) return el;
+    let node = el.firstElementChild;
+    for (let guard = 0; node && guard < 40; guard++) {
+      if (!isHiddenText(node)) {
+        if (hasOwnText(node)) return node;
+        const deeper = textStyleSource(node);
+        if (deeper !== node) return deeper;
+      }
+      node = node.nextElementSibling;
+    }
+    return el;
+  }
+
+  // Paint the colour on a one-pixel canvas and read it back, which is the only
+  // way to learn what a modern colour space really is: Tailwind emits oklch()
+  // and color-mix(), and reading the string cannot tell green from invisible.
+  // Legacy rgb/rgba never takes this path, so exact values stay exact.
+  let colorPad = null;
+  function colorRGBA(c) {
+    if (!c) return null;
+    try {
+      if (!colorPad) {
+        const cv = document.createElement('canvas');
+        cv.width = 1;
+        cv.height = 1;
+        colorPad = cv.getContext('2d', { willReadFrequently: true });
+      }
+      colorPad.fillStyle = '#000';
+      colorPad.fillStyle = c;
+      const onBlack = colorPad.fillStyle;
+      colorPad.fillStyle = '#fff';
+      colorPad.fillStyle = c;
+      if (colorPad.fillStyle !== onBlack) return null; // the browser refused it
+      colorPad.clearRect(0, 0, 1, 1);
+      colorPad.fillStyle = onBlack;
+      colorPad.fillRect(0, 0, 1, 1);
+      const d = colorPad.getImageData(0, 0, 1, 1).data;
+      return { r: d[0], g: d[1], b: d[2], a: d[3] / 255 };
+    } catch (e) {
+      return null; // canvas reading blocked: the raw string is still the truth
+    }
+  }
+
+  const LEGACY_RGB = /^rgba?\(([^)]+)\)$/;
+
+  // Always hex, with the opacity beside it the way a design tool writes it:
+  // "#141414 4%" reads instantly, "rgba(20, 20, 20, 0.04)" does not.
+  function toHex(color) {
+    const hex = (x) => Math.round(x).toString(16).padStart(2, '0');
+    const withAlpha = (base, a) => (a >= 1 ? base : a === 0 ? 'transparent' : base + ' ' + Math.round(a * 100) + '%');
+    const legacy = LEGACY_RGB.exec(String(color).trim());
+    // only the comma form is parsed here; space syntax goes to the canvas
+    if (legacy && legacy[1].indexOf(',') >= 0) {
+      const p = legacy[1].split(',').map((s) => parseFloat(s));
+      const a = p.length > 3 ? p[3] : 1;
+      return withAlpha(('#' + hex(p[0]) + hex(p[1]) + hex(p[2])).toUpperCase(), a);
+    }
+    const measured = colorRGBA(color);
+    if (!measured) return color;
+    if (measured.a === 0) return 'transparent';
+    // read the colour again at full opacity: a nearly-transparent pixel cannot
+    // report its own channels accurately
+    const solid = colorRGBA(String(color).replace(/\s*\/\s*[\d.]+%?\s*\)\s*$/, ')')) || measured;
+    return withAlpha(('#' + hex(solid.r) + hex(solid.g) + hex(solid.b)).toUpperCase(), measured.a);
+  }
+
+  // The bubble talks to a designer, so it says "#141414 4%". The copied card
+  // talks to whoever edits the code, so it must stay valid CSS: hex when the
+  // colour is opaque, the authored value untouched when it is not.
+  function cssColor(color) {
+    const shown = toHex(color);
+    if (shown === 'transparent') return 'transparent';
+    return /%$/.test(shown) ? String(color).trim() : shown;
+  }
+
+  function isTransparent(c) {
+    if (!c || c === 'transparent') return true;
+    const legacy = LEGACY_RGB.exec(String(c).trim());
+    if (legacy && legacy[1].indexOf(',') >= 0) {
+      const p = legacy[1].split(',').map((s) => parseFloat(s));
+      return p.length > 3 && p[3] === 0;
+    }
+    const v = colorRGBA(c);
+    return !!v && v.a === 0;
+  }
 
   function weightName(w) {
     const names = {
@@ -121,20 +215,120 @@
 
   // Corner radius: one number when all four match, per-corner letters when they
   // differ, and null when there is none at all, which drops the row entirely.
-  function cornerLabel(cs) {
-    const one = (p) => {
-      const v = String(cs[p]).split(' ')[0];
-      if (v.endsWith('%')) return v;
-      return Math.round(parseFloat(v) || 0);
+  // A radius at or past half the element reads "full", because that is what a
+  // pill or a circle means; the raw number there is meaningless, and a
+  // Tailwind rounded-full computes to tens of millions of pixels.
+  // The element's own layout box, free of any scaling a parent applies: a 20px
+  // radius inside a scaled preview must not read as a pill.
+  function layoutBox(el) {
+    const r = el.getBoundingClientRect ? el.getBoundingClientRect() : { width: 0, height: 0 };
+    const w = typeof el.offsetWidth === 'number' && el.offsetWidth ? el.offsetWidth : r.width;
+    const h = typeof el.offsetHeight === 'number' && el.offsetHeight ? el.offsetHeight : r.height;
+    return { w, h };
+  }
+
+  // Computed lengths arrive divided by the page's zoom; this puts them back.
+  const zoomOf = (el) => (el && typeof el.currentCSSZoom === 'number' ? el.currentCSSZoom : 1) || 1;
+
+  function cornerValues(cs, el) {
+    const { w, h } = layoutBox(el);
+    const z = zoomOf(el);
+    // per axis: the first length of a corner is horizontal, the second vertical
+    const one = (v, cap) => {
+      if (v.endsWith('%')) return parseFloat(v) >= 50 ? 'full' : v;
+      const n = (parseFloat(v) || 0) * z;
+      if (cap > 0 && n >= cap) return 'full';
+      return String(Math.round(n));
     };
-    const vals = [
-      ['TL', one('borderTopLeftRadius')], ['TR', one('borderTopRightRadius')],
-      ['BR', one('borderBottomRightRadius')], ['BL', one('borderBottomLeftRadius')],
+    const corner = (p) => {
+      const raw = String(cs[p]).trim();
+      // calc(), min(), clamp() with a percentage stay unresolved: print them
+      // verbatim rather than shredding them on spaces
+      if (raw.indexOf('(') >= 0) return raw;
+      const parts = raw.split(/\s+/);
+      if (parts.length === 1) return one(parts[0], Math.min(w, h) / 2);
+      const a = one(parts[0], w / 2);
+      const b = one(parts[1], h / 2);
+      return a === b ? a : a + '/' + b;
+    };
+    return [
+      ['TL', corner('borderTopLeftRadius')], ['TR', corner('borderTopRightRadius')],
+      ['BR', corner('borderBottomRightRadius')], ['BL', corner('borderBottomLeftRadius')],
     ];
-    const isZero = (v) => v === 0 || v === '0%';
+  }
+
+  function cornerLabel(cs, el) {
+    const vals = cornerValues(cs, el);
+    const isZero = (v) => v === '0' || v === '0%';
     if (vals.every(([, v]) => isZero(v))) return null;
-    if (vals.every(([, v]) => String(v) === String(vals[0][1]))) return 'Radius ' + vals[0][1];
-    return 'Radius ' + vals.filter(([, v]) => !isZero(v)).map(([c, v]) => c + v).join(' ');
+    if (vals.every(([, v]) => v === vals[0][1])) return 'Radius ' + vals[0][1];
+    return 'Radius ' + vals.filter(([, v]) => !isZero(v)).map(([c, v]) => c + v).join(', ');
+  }
+
+  // Border, only when one is actually painted: width, style and colour, per
+  // side when the sides disagree. A gradient border paints from an image and
+  // reports a transparent colour, so the image is what gets named.
+  function borderLabel(cs, el, fmt) {
+    const paint = fmt || toHex;
+    const z = zoomOf(el);
+    const img = cs.borderImageSource;
+    if (img && img !== 'none') {
+      const w = Math.round((parseFloat(cs.borderTopWidth) || 0) * z);
+      const shortImg = img.length > 120 ? img.slice(0, 120) + '…' : img;
+      return (w ? w + 'px ' : '') + 'image ' + shortImg;
+    }
+    const read = (s) => ({
+      side: s[0],
+      w: Math.round((parseFloat(cs['border' + s + 'Width']) || 0) * z),
+      style: cs['border' + s + 'Style'],
+      color: cs['border' + s + 'Color'],
+    });
+    const all = ['Top', 'Right', 'Bottom', 'Left'].map(read);
+    const shown = (b) => b.w > 0 && b.style !== 'none' && !isTransparent(b.color);
+    const visible = all.filter(shown);
+    if (!visible.length) return null;
+    const one = (b) => b.w + 'px, ' + b.style + ', ' + paint(b.color);
+    const uniform = all.every((b) => shown(b) && one(b) === one(all[0]));
+    if (uniform) return one(all[0]);
+    return visible.map((b) => b.side + ' ' + one(b)).join(' · ');
+  }
+
+  // Split a value list on its own commas, never on the ones inside rgb(...).
+  function splitTop(value) {
+    const out = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < value.length; i++) {
+      const ch = value[i];
+      if (ch === '(') depth++;
+      else if (ch === ')') depth--;
+      else if (ch === ',' && depth === 0) { out.push(value.slice(start, i)); start = i + 1; }
+    }
+    out.push(value.slice(start));
+    return out.map((s) => s.trim()).filter(Boolean);
+  }
+
+  // Shadows, written the way a person authors them: offsets first, colour last.
+  // The browser reports colour first, which reads backwards to a designer.
+  function shadowLabel(cs, fmt) {
+    const paint = fmt || toHex;
+    const raw = cs.boxShadow;
+    if (!raw || raw === 'none') return null;
+    const parts = [];
+    for (const piece of splitTop(raw)) {
+      const m = /^([a-z]+\([^)]*\)|#[0-9a-f]{3,8})\s+(.*)$/i.exec(piece);
+      const color = m ? m[1] : '';
+      const rest = (m ? m[2] : piece).replace(/\s+/g, ' ').trim();
+      // Tailwind fills its unused shadow slots with transparent zero-size
+      // shadows; they paint nothing, so they are not worth a designer's eye.
+      if (color && isTransparent(color)) continue;
+      const nums = rest.match(/-?[\d.]+/g);
+      if (nums && nums.length && nums.every((n) => parseFloat(n) === 0)) continue;
+      parts.push(m ? rest.split(' ').join(', ') + ', ' + paint(color) : piece);
+    }
+    if (!parts.length) return null;
+    const shown = parts.slice(0, 2).join(' · ') + (parts.length > 2 ? ' · …' : '');
+    return shown.length > 120 ? shown.slice(0, 120) + '…' : shown;
   }
 
   // Sides in the owner's order, L R T B. A zero side is omitted; all-zero -> "0".
@@ -143,31 +337,61 @@
     const parts = [['L', read('Left')], ['R', read('Right')], ['T', read('Top')], ['B', read('Bottom')]]
       .filter(([, v]) => v !== 0)
       .map(([s, v]) => s + v);
-    return parts.length ? parts.join(' ') : '0';
+    return parts.length ? parts.join(', ') : '0';
   }
 
   // ---------- the bubble ----------
 
-  function row(text, swatch) {
-    const div = document.createElement('div');
-    div.textContent = text; // page data stays text, never markup
-    Object.assign(div.style, {
-      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-    });
-    if (swatch) {
-      const s = document.createElement('span');
-      Object.assign(s.style, {
-        display: 'inline-block', width: '12px', height: '12px',
-        background: swatch, border: '1px solid rgba(255, 255, 255, 0.45)',
-        borderRadius: '2px', marginLeft: '8px', verticalAlign: '-1px',
-      });
-      div.appendChild(s);
+  // What sits behind a colour on the page, so a see-through value can be shown
+  // over its real backdrop instead of over the bubble's own blue.
+  function backdropOf(el) {
+    let n = el;
+    for (let i = 0; n && i < 12; i++) {
+      const c = getComputedStyle(n).backgroundColor;
+      if (!isTransparent(c)) return c;
+      n = n.parentElement;
     }
-    bubble.appendChild(div);
+    return '#ffffff';
+  }
+
+  // Rows are collected first and only drawn when they differ from what is
+  // already on screen: rebuilding on every mouse move made the numbers flicker.
+  let pendingRows = [];
+  let drawnSignature = '';
+
+  function row(text, swatch, base) {
+    pendingRows.push({ text: text, swatch: swatch, base: base });
+  }
+
+  function drawRows() {
+    const signature = pendingRows.map((r) => r.text + '|' + (r.swatch || '')).join('\n');
+    if (signature === drawnSignature) { pendingRows = []; return; }
+    drawnSignature = signature;
+    bubble.textContent = '';
+    for (const r of pendingRows) {
+      const div = document.createElement('div');
+      div.textContent = r.text; // page data stays text, never markup
+      Object.assign(div.style, {
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      });
+      if (r.swatch) {
+        const s = document.createElement('span');
+        Object.assign(s.style, {
+          display: 'inline-block', width: '12px', height: '12px',
+          backgroundColor: r.base || '#ffffff',
+          backgroundImage: 'linear-gradient(' + r.swatch + ', ' + r.swatch + ')',
+          border: '1px solid rgba(255, 255, 255, 0.45)',
+          borderRadius: '2px', marginLeft: '8px', verticalAlign: '-1px',
+        });
+        div.appendChild(s);
+      }
+      bubble.appendChild(div);
+    }
+    pendingRows = [];
   }
 
   function fillBubble(el) {
-    bubble.textContent = '';
+    pendingRows = [];
     const cls = classesOf(el);
     row(tagLabel(el) + ' · ' + (cls || '(no class)'));
 
@@ -176,16 +400,22 @@
     const size = Math.round(r.width) + ' × ' + Math.round(r.height);
     const bg = cs.backgroundColor;
     const painted = !isTransparent(bg);
-    const bgRow = () => row('Bg ' + (painted ? toHex(bg) : 'none'), painted ? bg : null);
+    // a see-through colour is shown over what the page really has behind it
+    const behindEl = backdropOf(el.parentElement || el);
+    const behindText = backdropOf(el);
+    const bgRow = () => row('Bg ' + (painted ? toHex(bg) : 'none'), painted ? bg : null, behindEl);
 
     const kind = kindOf(el);
     if (kind === 'image') {
       row(size);
     } else if (kind === 'text') {
-      row(fontName(cs.fontFamily));
-      row(weightName(cs.fontWeight));
-      row(pxLabel(cs.fontSize));
-      row(toHex(cs.color), cs.color);
+      // the style of the words on screen, which on a wrapper lives in a child
+      const t = textStyleSource(el);
+      const tcs = t === el ? cs : getComputedStyle(t);
+      row(fontName(tcs.fontFamily));
+      row(weightName(tcs.fontWeight));
+      row(pxLabel(tcs.fontSize));
+      row(toHex(tcs.color), tcs.color, behindText);
       // A button or link always owns its Bg row; other text shows one only
       // when it actually paints a background.
       if (painted || TAG_UP(el) === 'BUTTON' || TAG_UP(el) === 'A') bgRow();
@@ -196,8 +426,13 @@
       row('Margin ' + sidesLabel(cs, 'margin'));
       row('Padding ' + sidesLabel(cs, 'padding'));
     }
-    const corners = cornerLabel(cs);
+    const corners = cornerLabel(cs, el);
     if (corners) row(corners);
+    const border = borderLabel(cs, el);
+    if (border) row('Border ' + border);
+    const shadow = shadowLabel(cs);
+    if (shadow) row('Shadow ' + shadow);
+    drawRows();
   }
 
   // ---------- placing ----------
@@ -402,6 +637,7 @@
   function hide() {
     box.style.display = 'none';
     bubble.style.display = 'none';
+    drawnSignature = '';
     clearBands();
   }
 
@@ -436,6 +672,7 @@
   function flash(text, ok) {
     if (flashTimer) clearTimeout(flashTimer);
     bubble.textContent = '';
+    drawnSignature = ''; // the flash owns the bubble; the next hover redraws
     bubbleDisplay = 'flex';
     Object.assign(bubble.style, {
       background: ok ? FLASH_OK : FLASH_FAIL, padding: '16px 32px', borderRadius: '999px',
@@ -470,6 +707,7 @@
   function stopInspect() {
     inspecting = false;
     target = null;
+    if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; }
     if (flashTimer) {
       clearTimeout(flashTimer);
       flashTimer = 0;
@@ -485,16 +723,40 @@
 
   // ---------- the ID card ----------
 
+  // The words a person can actually read, gathered node by node: markup text
+  // and hidden labels are skipped, and a space is kept between children so two
+  // sentences never fuse into a word that exists in no file.
+  function visibleText(el) {
+    let out = '';
+    const walk = (node, depth) => {
+      if (out.length > 400 || depth > 12) return;
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) {
+          const t = child.nodeValue.replace(/\s+/g, ' ');
+          if (t.trim()) out += (out && !/\s$/.test(out) ? ' ' : '') + t.trim() + ' ';
+        } else if (child.nodeType === 1 && !isHiddenText(child)) {
+          walk(child, depth + 1);
+        }
+        if (out.length > 400) return;
+      }
+    };
+    walk(el, 0);
+    return out.replace(/\s+/g, ' ').trim();
+  }
+
   function ownWords(el, max) {
-    const t = (el.textContent || '').trim().replace(/\s+/g, ' ');
+    const t = visibleText(el);
     if (!t) return '';
     const words = t.split(' ');
-    return words.slice(0, max).join(' ') + (words.length > max ? ' …' : '');
+    const cut = words.slice(0, max).join(' ');
+    const clipped = cut.length > 80 ? cut.slice(0, 80).trim() : cut;
+    // a quote inside the excerpt would break the card's own quoting
+    return clipped.replace(/"/g, "'") + (words.length > max || clipped !== cut ? ' …' : '');
   }
 
   function nameOf(el) {
     const cls = classesOf(el);
-    return (el.tagName || '').toLowerCase() + (cls ? '.' + cls.split(' ')[0] : '');
+    return tagName(el) + (cls ? '.' + cls.split(' ')[0] : '');
   }
 
   function ordinal(n) {
@@ -578,7 +840,7 @@
 
     const lines = [
       'page:    ' + location.pathname + location.search + location.hash,
-      'element: ' + (el.tagName || '').toLowerCase() + (words ? ' · "' + words + '"' : ''),
+      'element: ' + tagName(el) + (words ? ' · "' + words + '"' : ''),
       'classes: ' + (cls || '(none)'),
     ];
     if (chain.length || pos) {
@@ -587,16 +849,31 @@
     if (el.getBoundingClientRect) {
       const r = el.getBoundingClientRect();
       const cs = getComputedStyle(el);
+      const corners = cornerLabel(cs, el);
       lines.push('box:     ' + Math.round(r.width) + ' × ' + Math.round(r.height) +
-        ' · margin ' + sidesLabel(cs, 'margin') + ' · padding ' + sidesLabel(cs, 'padding'));
+        ' · margin ' + sidesLabel(cs, 'margin') + ' · padding ' + sidesLabel(cs, 'padding') +
+        (corners ? ' · ' + corners.toLowerCase() : ''));
+      const border = borderLabel(cs, el, cssColor);
+      if (border) lines.push('border:  ' + border);
+      const shadow = shadowLabel(cs, cssColor);
+      if (shadow) lines.push('shadow:  ' + shadow);
+      if (kindOf(el) === 'text') {
+        const t = textStyleSource(el);
+        const tcs = t === el ? cs : getComputedStyle(t);
+        lines.push('type:    ' + fontName(tcs.fontFamily) + ', ' + weightName(tcs.fontWeight) +
+          ', ' + pxLabel(tcs.fontSize) + ', ' + cssColor(tcs.color));
+      }
     }
     const src = sourceOf(el);
     if (src) lines.push('file:    ' + src);
+    // one field per line is the card's contract: no attribute value may carry a
+    // newline into it, and none may run away in length
+    const flat = (v) => String(v).replace(/\s+/g, ' ').trim().slice(0, 120);
     const handles = [];
-    if (el.id) handles.push('id=' + el.id);
+    if (el.id) handles.push('id=' + flat(el.id));
     for (const a of ['data-testid', 'data-test', 'aria-label', 'name', 'role']) {
       const v = el.getAttribute && el.getAttribute(a);
-      if (v) handles.push(a + '=' + v);
+      if (v) handles.push(a + '=' + flat(v));
     }
     if (handles.length) lines.push('attrs:   ' + handles.join(' · '));
     lines.push('view:    ' + innerWidth + ' × ' + innerHeight + ' · ' + pageTheme());
@@ -650,13 +927,33 @@
 
   window.addEventListener('blur', () => stopInspect(), true);
 
+  // Crossing from one element to the next sweeps over the wrappers in between,
+  // and reading each of them made several values flash by. A new element is
+  // adopted only once the cursor has settled on it; the bubble keeps riding
+  // the cursor meanwhile, so the delay is felt as steadiness, not lag.
+  const SETTLE_MS = 60;
+
+  function aimAt(el) {
+    if (el === target) {
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; }
+      return;
+    }
+    if (!target) { target = el; return; } // first element: no reason to wait
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      settleTimer = 0;
+      target = el;
+      paint();
+    }, SETTLE_MS);
+  }
+
   document.addEventListener('mousemove', (e) => {
     lastX = e.clientX;
     lastY = e.clientY;
     if (!inspecting) return;
     const el = e.composedPath ? e.composedPath()[0] : e.target;
     if (el instanceof Element && el !== box && el !== bubble && !bubble.contains(el)) {
-      target = el;
+      aimAt(el);
     }
     paint();
   }, true);
