@@ -429,7 +429,7 @@
     pendingRows = [];
     pendingGap = false;
     const cls = classesOf(el);
-    row(tagLabel(el) + ' · ' + (cls || '(no class)'));
+    row(tagLabel(el) + ' · ' + (cls || 'No class'));
 
     const cs = getComputedStyle(el);
     const r = el.getBoundingClientRect();
@@ -439,7 +439,7 @@
     // a see-through colour is shown over what the page really has behind it
     const behindEl = backdropOf(el.parentElement || el);
     const behindText = backdropOf(el);
-    const bgRow = () => row('Bg: ' + (painted ? capWords(toHex(bg)) : 'None'), painted ? bg : null, behindEl);
+    const bgRow = () => row('Bg: ' + capWords(toHex(bg)), bg, behindEl);
     // a zero side is not news: the row appears only when there is spacing
     const spacingRow = (label, prop) => {
       const v = sidesLabel(cs, prop);
@@ -449,7 +449,8 @@
     // Four groups, always in this order, separated by a breath: what it is,
     // how it reads, how it sits, how it looks. An empty group disappears.
     const kind = kindOf(el);
-    let showBg = kind !== 'image';
+    // no background is not news either: the row appears only when one is painted
+    let showBg = kind !== 'image' && painted;
 
     if (kind === 'text') {
       // the style of the words on screen, which on a wrapper lives in a child
@@ -458,14 +459,13 @@
       gap();
       row(fontName(tcs.fontFamily));
       row(weightName(tcs.fontWeight) + ', ' + pxLabel(tcs.fontSize));
-      row('L-H: ' + capWords(pxLabel(tcs.lineHeight)));
+      // a line height nobody set says nothing: only a real one takes a row
+      const lh = pxLabel(tcs.lineHeight);
+      if (lh !== 'normal') row('L-H: ' + lh);
       if (tcs.letterSpacing && tcs.letterSpacing !== 'normal') {
         row('L-S: ' + fineLabel(tcs.letterSpacing));
       }
       row('Text: ' + capWords(toHex(tcs.color)), tcs.color, behindText);
-      // A button or link always owns its Bg row; other text shows one only
-      // when it actually paints a background.
-      showBg = painted || TAG_UP(el) === 'BUTTON' || TAG_UP(el) === 'A';
     }
 
     gap();
