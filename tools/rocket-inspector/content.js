@@ -762,11 +762,28 @@
     }
   }
 
+  // The bands depend on the element's geometry, not on the cursor, so they are
+  // rebuilt only when the element or its box changes. Rebuilding them on every
+  // mouse move meant a forced layout per move on a heavy page, which read as lag.
+  let bandsFor = null;
+  let bandsBox = '';
+
+  function boxKey(el) {
+    const r = el.getBoundingClientRect();
+    return r.left + ',' + r.top + ',' + r.width + ',' + r.height;
+  }
+
+  function redrawBands() {
+    drawBands(target);
+    drawOutward(target);
+    bandsFor = target;
+    bandsBox = target && target.getBoundingClientRect ? boxKey(target) : '';
+  }
+
   function paint() {
     if (!inspecting || !target) { hide(); return; }
     if (!flashTimer) fillBubble(target);
-    drawBands(target);
-    drawOutward(target);
+    if (target !== bandsFor || !target.getBoundingClientRect || boxKey(target) !== bandsBox) redrawBands();
     place(); // last, so the bubble can clear the bands it now knows about
   }
 
@@ -776,6 +793,7 @@
     drawnSignature = '';
     unlockBubbleSize();
     clearBands();
+    bandsFor = null;
   }
 
   // The confirmation panel wears the bubble the element's facts were wearing:
@@ -1326,8 +1344,8 @@
     paint();
   }, true);
 
-  window.addEventListener('scroll', () => { if (inspecting) { drawBands(target); drawOutward(target); place(); } }, true);
-  window.addEventListener('resize', () => { if (inspecting) { drawBands(target); drawOutward(target); place(); } }, true);
+  window.addEventListener('scroll', () => { if (inspecting) { redrawBands(); place(); } }, true);
+  window.addEventListener('resize', () => { if (inspecting) { redrawBands(); place(); } }, true);
 
   // While inspecting, the mouse belongs to the picker: nothing reaches the page,
   // so copying a link's card never navigates and a button never fires.
