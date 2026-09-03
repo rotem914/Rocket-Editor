@@ -713,11 +713,21 @@
     const r = el.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;
     const bandSet = new Set(bands);
-    const rectsAround = (node) => [...node.parentElement.children]
-      .filter((c) => c !== node && c !== box && c !== bubble && !bandSet.has(c) &&
-        getComputedStyle(c).display !== 'none')
-      .map((c) => c.getBoundingClientRect())
-      .filter((s) => s.width > 0 && s.height > 0);
+    // Each container's siblings are read once and shared by the four directions,
+    // and nothing is written until every direction is measured, so a hop costs
+    // one layout instead of one per direction.
+    const aroundCache = new Map();
+    const rectsAround = (node) => {
+      if (!aroundCache.has(node)) {
+        aroundCache.set(node, [...node.parentElement.children]
+          .filter((c) => c !== node && c !== box && c !== bubble && !bandSet.has(c) &&
+            getComputedStyle(c).display !== 'none')
+          .map((c) => c.getBoundingClientRect())
+          .filter((s) => s.width > 0 && s.height > 0));
+      }
+      return aroundCache.get(node);
+    };
+    const pending = [];
     const overlapX = (s) => Math.min(s.right, r.right) > Math.max(s.left, r.left);
     const overlapY = (s) => Math.min(s.bottom, r.bottom) > Math.max(s.top, r.top);
 
@@ -753,13 +763,14 @@
         }
         if (touching) break;
         if (dir.dist(edge) >= 3) {
-          addBand(dir.geo(edge), OUTSIDE_BAND);
+          pending.push(dir.geo(edge));
           if (dir.remember) dir.remember(edge);
           break;
         }
         node = parent; // the wall hugs the element: look one container further out
       }
     }
+    for (const geo of pending) addBand(geo, OUTSIDE_BAND);
   }
 
   // The bands depend on the element's geometry, not on the cursor, so they are
@@ -1318,15 +1329,23 @@
   // the cursor meanwhile, so the delay is felt as steadiness, not lag.
   const SETTLE_MS = 60;
 
+  let settleFor = null; // the element the running wait is counting for
+
   function aimAt(el) {
     if (el === target) {
-      if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; }
+      if (settleTimer) { clearTimeout(settleTimer); settleTimer = 0; settleFor = null; }
       return;
     }
     if (!target) { target = el; return; } // first element: no reason to wait
+    // The wait counts from ENTERING the element, not from the last mouse move:
+    // restarting it on every move meant the bubble only caught up once the
+    // mouse stood still, which read as lag on a fast sweep.
+    if (settleTimer && settleFor === el) return;
     if (settleTimer) clearTimeout(settleTimer);
+    settleFor = el;
     settleTimer = setTimeout(() => {
       settleTimer = 0;
+      settleFor = null;
       target = el;
       endFlash();
       paint();
