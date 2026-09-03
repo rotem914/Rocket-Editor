@@ -103,13 +103,20 @@ search for, and a pointer to where the reasoning lives. Never restate the record
 point at it, because two copies of the same finding drift apart and then neither
 one is worth trusting. Group the rows under the dimensions above.
 
-### Data & persistence integrity
+### State & concurrency
 
-> *Example row — delete this one when you write your first real one.*
->
-> - 🔴 **Every write is atomic** — a save writes to a temporary file and then swaps
->   it into place. A direct in-place write can leave a half-written file if the
->   process dies mid-save. (Source: `project-os/Decisions.md`, the storage entry.)
+- 🟠 **The confirmation never outlives the key.** Any async step that ends in the
+  bubble (an animation's `onfinish`, the clipboard promise, a timer) must re-check
+  `inspecting` and `target` when it runs, not when it started. Search for
+  `swapContent(` and `.then(` in `content.js`. (Source: `project-os/BugAtlas.md`
+  row 1; bitten twice on 2026-09-03.)
+
+### Input & values
+
+- 🟠 **A card value from a React fiber comes from a dev build only.** Production
+  fibers carry minified names that exist in no file; the card's rule is that
+  unknown is never guessed. Search for `__reactFiber$` and check the `_debugOwner`
+  gate is still there. (Source: `notes/Code-Review-2026-09-03-B.md` T2.)
 
 ## Bootstrap recipe — fill the list from this project's own memory
 

@@ -15,6 +15,7 @@
   let lastY = -1;
   let flashTimer = 0;      // non-zero while the "copied" flash owns the bubble
   let flashGen = 0;        // every swap claims one; an overtaken swap bows out
+  let flashOk = null;      // the outcome the confirmation panel is showing
   let settleTimer = 0;     // waiting for the cursor to settle on a new element
 
   const Z = '2147483647';
@@ -670,7 +671,7 @@
   function drawBands(el) {
     clearBands();
     if (el) insideTheme = isDarkColor(backdropOf(el)) ? 'dark' : 'light';
-    drawPadding(el); // first, so it sits under the gaps between the children
+    if (el && kindOf(el) !== 'image') drawPadding(el); // first, so it sits under the gaps between the children
     if (!el || kindOf(el) !== 'box') return;
     const kids = [...el.children]
       .filter((c) => c !== box && c !== bubble && !bands.includes(c) &&
@@ -927,17 +928,37 @@
   // Both outcomes wear the same panel; only the words differ, and only the
   // success one carries the ring and its tick.
   function flash(ok) {
+    // nothing on screen to confirm into: the key was released while the copy was
+    // in flight, or no element was ever hovered
+    if (!inspecting || !target) return;
     if (flashTimer > 0) {
       // the confirmation is already up: it stays, and this click buys it a fresh hold
       clearTimeout(flashTimer);
       flashTimer = setTimeout(restoreFacts, FLASH_HOLD_MS);
+      if (ok !== flashOk) {
+        // a different outcome rewrites the panel in place; the bubble is already its shape
+        flashOk = ok;
+        content.textContent = '';
+        content.appendChild(copiedPanel(ok));
+      }
       return;
     }
     const gen = ++flashGen;
+    const el = target; // the element the confirmation is about
     flashTimer = -1; // the panel owns the bubble from this instant, not from the swap
     lockBubbleSize();
     swapContent(() => {
       if (gen !== flashGen) return false; // a newer click, or the key was released
+      if (target !== el) {
+        // the cursor settled on another element during the swap: its facts rise in,
+        // and the message about the one he left is dropped
+        flashTimer = 0;
+        drawnSignature = '';
+        unlockBubbleSize();
+        fillBubble(target);
+        return;
+      }
+      flashOk = ok;
       drawnSignature = '';
       content.textContent = '';
       content.appendChild(copiedPanel(ok));
@@ -1073,10 +1094,13 @@
     };
     const c = bgOf(document.body) || bgOf(document.documentElement);
     if (!c) return 'light';
-    const m = /rgba?\(([^)]+)\)/.exec(c);
-    if (!m) return 'light';
-    const p = m[1].split(',').map(parseFloat);
-    return (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) < 128 ? 'dark' : 'light';
+    // legacy rgb() is read exactly; oklch() and the rest are painted and measured
+    const m = /^rgba?\(([^)]+)\)$/.exec(c.trim());
+    if (m && m[1].indexOf(',') >= 0) {
+      const p = m[1].split(',').map(parseFloat);
+      return (0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2]) < 128 ? 'dark' : 'light';
+    }
+    return isDarkColor(c) ? 'dark' : 'light';
   }
 
   // React 19 removed the source location from its fibers, so a modern dev build
@@ -1097,6 +1121,9 @@
       for (const k in node) {
         if (k.indexOf('__reactFiber$') !== 0 && k.indexOf('__reactInternalInstance$') !== 0) continue;
         let f = node[k];
+        // a production build has no _debug fields, and its names are minified:
+        // "Ko" names no file, so unknown stays unknown
+        if (!f || !('_debugOwner' in f)) break;
         for (let d = 0; f && d < 12; d++) {
           const name = typeName(f.elementType || f.type);
           if (name && name.length < 60 && /^[A-Z]/.test(name)) {
@@ -1121,7 +1148,7 @@
     if (isGrid) {
       parts.push(d);
       const cols = cs.gridTemplateColumns;
-      if (cols && cols !== 'none' && cols !== 'subgrid') {
+      if (cols && cols !== 'none' && cols.indexOf('subgrid') !== 0) {
         // line names travel in brackets and are not tracks: [full-start] 100px …
         const tracks = cols.replace(/\[[^\]]*\]/g, ' ').trim().split(/\s+/).filter(Boolean);
         if (tracks.length) {
