@@ -860,6 +860,7 @@
   // Out: down 8px while fading, ease-in. In: up 8px while fading, ease-out.
   // Both 144ms, and the content is never left invisible if the clock stalls.
   const SWAP_MS = 144;
+  const FLASH_HOLD_MS = 2400; // how long the confirmation stays; a click on it starts this over
 
   function swapContent(build) {
     let settled = false;
@@ -926,7 +927,12 @@
   // Both outcomes wear the same panel; only the words differ, and only the
   // success one carries the ring and its tick.
   function flash(ok) {
-    if (flashTimer && flashTimer > 0) clearTimeout(flashTimer);
+    if (flashTimer > 0) {
+      // the confirmation is already up: it stays, and this click buys it a fresh hold
+      clearTimeout(flashTimer);
+      flashTimer = setTimeout(restoreFacts, FLASH_HOLD_MS);
+      return;
+    }
     const gen = ++flashGen;
     flashTimer = -1; // the panel owns the bubble from this instant, not from the swap
     lockBubbleSize();
@@ -938,7 +944,7 @@
       // the panel is centred in the box the facts left behind, both ways
       bubbleDisplay = 'flex';
       Object.assign(bubble.style, { alignItems: 'center', justifyContent: 'center' });
-      flashTimer = setTimeout(restoreFacts, 2400);
+      flashTimer = setTimeout(restoreFacts, FLASH_HOLD_MS);
     });
   }
 
@@ -1077,13 +1083,13 @@
   // has no file to give. The component NAME is still there, and it names the
   // file to open. Walks a few ancestors, marked when it came from one.
   function componentOf(el) {
-    const nameOf = (type) => {
+    const typeName = (type) => {
       if (!type) return '';
       if (typeof type === 'string') return '';          // a plain host element
       if (type.displayName) return String(type.displayName);
       if (type.name) return String(type.name);
-      if (type.render) return nameOf(type.render);      // forwardRef
-      if (type.type) return nameOf(type.type);          // memo
+      if (type.render) return typeName(type.render);    // forwardRef
+      if (type.type) return typeName(type.type);        // memo
       return '';
     };
     let node = el;
@@ -1092,7 +1098,7 @@
         if (k.indexOf('__reactFiber$') !== 0 && k.indexOf('__reactInternalInstance$') !== 0) continue;
         let f = node[k];
         for (let d = 0; f && d < 12; d++) {
-          const name = nameOf(f.elementType || f.type);
+          const name = typeName(f.elementType || f.type);
           if (name && name.length < 60 && /^[A-Z]/.test(name)) {
             return name + (node === el ? '' : ' (parent)');
           }

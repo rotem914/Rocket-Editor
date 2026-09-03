@@ -108,7 +108,7 @@ Problem: the inner arrow nameOf(type) shares its name with nameOf(el) at line 86
          calls for the parent line; reading either now needs a second look.
 Fix:     rename the inner one, e.g. typeName.
 Verify:  syntax check; parent and comp lines unchanged on the probe page.
-Status:  [ ] open
+Status:  [x] done, renamed to typeName on 2026-09-03
 ```
 
 ```
