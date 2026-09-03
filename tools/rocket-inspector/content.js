@@ -397,11 +397,11 @@
     content.textContent = '';
     for (const r of pendingRows) {
       const div = document.createElement('div');
-      div.textContent = r.text; // page data stays text, never markup
       Object.assign(div.style, {
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       });
       if (r.style) Object.assign(div.style, r.style);
+      div.textContent = r.text; // page data stays text, never markup
       if (r.swatch) {
         const s = document.createElement('span');
         Object.assign(s.style, {
@@ -409,7 +409,7 @@
           backgroundColor: r.base || '#ffffff',
           backgroundImage: 'linear-gradient(' + r.swatch + ', ' + r.swatch + ')',
           border: '1px solid rgba(255, 255, 255, 0.45)',
-          borderRadius: '2px', marginLeft: '8px', verticalAlign: '-1px',
+          borderRadius: '999px', marginLeft: '8px', verticalAlign: '-1px',
         });
         div.appendChild(s);
       }
@@ -459,13 +459,14 @@
       gap();
       row(fontName(tcs.fontFamily));
       row(weightName(tcs.fontWeight) + ', ' + pxLabel(tcs.fontSize));
+      // the colour rides with the type: the code and its swatch, no label
+      row(capWords(toHex(tcs.color)), tcs.color, behindText);
       // a line height nobody set says nothing: only a real one takes a row
       const lh = pxLabel(tcs.lineHeight);
       if (lh !== 'normal') row('L-H: ' + lh);
       if (tcs.letterSpacing && tcs.letterSpacing !== 'normal') {
         row('L-S: ' + fineLabel(tcs.letterSpacing));
       }
-      row('Text: ' + capWords(toHex(tcs.color)), tcs.color, behindText);
     }
 
     gap();
@@ -550,18 +551,51 @@
     bubble.style.left = Math.max(4, Math.min(left, innerWidth - bw - 8)) + 'px';
   }
 
-  const INSIDE_BAND = 'rgba(222, 180, 117, 0.32)';  // spaces between children
+  const INSIDE_BAND = 'rgba(222, 180, 117, 0.32)';  // internal spacing: gaps between
+                                                      // children, and an element's own padding
   const OUTSIDE_BAND = 'rgba(118, 161, 255, 0.32)'; // distances from the element outward
+  // The number on an orange band wears no pill, so inside and outside differ in
+  // kind and not only in colour: half as dark as the band over a light backdrop,
+  // a light sand over a dark one, judged per paint from what sits behind the element.
+  const INSIDE_INK = { light: '#6F5A3A', dark: '#F0D6AA' };
+  const INSIDE_HALO = { light: '#DFC9A6', dark: 'rgba(0, 0, 0, 0.75)' };
+  let insideTheme = 'light';
 
   function clearBands() {
     for (const b of bands) b.remove();
     bands.length = 0;
   }
 
-  // Three layers, bottom to top: band rectangles, then their number pills, then
-  // the bubble and highlight. Pills ride their own layer so a neighbouring
-  // band's wash can never tint or cover a number.
-  function addBand(geo, color) {
+  function isDarkColor(c) {
+    const v = colorRGBA(c);
+    return !!v && (0.2126 * v.r + 0.7152 * v.g + 0.0722 * v.b) < 128;
+  }
+
+  // A bare number centred on an orange band. When the band cannot hold the
+  // digits they spill over it with a hairline halo, so a 4px gap still says 4.
+  function bandNumber(left, top, width, height, label) {
+    const fitsIn = height >= 14 && width >= label.length * 7 + 4;
+    const halo = INSIDE_HALO[insideTheme];
+    const n = document.createElement('div');
+    n.textContent = label;
+    Object.assign(n.style, {
+      position: 'fixed', zIndex: '2147483646', pointerEvents: 'none',
+      left: (left + width / 2) + 'px', top: (top + height / 2) + 'px',
+      transform: 'translate(-50%, -50%)',
+      color: INSIDE_INK[insideTheme],
+      font: "500 12px/1 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
+      whiteSpace: 'nowrap',
+      textShadow: fitsIn ? 'none' : '0 0 2px ' + halo + ', 0 0 2px ' + halo + ', 0 0 3px ' + halo,
+    });
+    document.documentElement.appendChild(n);
+    bands.push(n);
+  }
+
+  // Three layers, bottom to top: band rectangles, then their numbers, then the
+  // bubble. Numbers ride their own layer so a neighbouring band's wash can
+  // never tint or cover one. An inside band gets a bare number; an outside
+  // band keeps its blue pill.
+  function addBand(geo, color, plain) {
     const d = document.createElement('div');
     Object.assign(d.style, {
       position: 'fixed', zIndex: '2147483645', pointerEvents: 'none',
@@ -572,6 +606,10 @@
     document.documentElement.appendChild(d);
     bands.push(d);
 
+    if (plain) {
+      bandNumber(geo.left, geo.top, geo.width, geo.height, String(Math.round(geo.gap)));
+      return;
+    }
     const chip = document.createElement('div');
     chip.textContent = String(Math.round(geo.gap));
     Object.assign(chip.style, {
@@ -586,8 +624,53 @@
     bands.push(chip);
   }
 
+  // The element's own padding, a wash on each side that has any, carrying its
+  // CSS value. Same colour as the gaps between children, since both are the
+  // element's inside, and laid down first so a gap always reads above it.
+  function padBand(left, top, width, height, value) {
+    if (width <= 0 || height <= 0) return;
+    const d = document.createElement('div');
+    Object.assign(d.style, {
+      position: 'fixed', zIndex: '2147483645', pointerEvents: 'none',
+      left: left + 'px', top: top + 'px', width: width + 'px', height: height + 'px',
+      background: INSIDE_BAND,
+    });
+    document.documentElement.appendChild(d);
+    bands.push(d);
+    bandNumber(left, top, width, height, String(Math.round(value)));
+  }
+
+  function drawPadding(el) {
+    if (!el || !el.getBoundingClientRect) return;
+    const cs = getComputedStyle(el);
+    const num = (v) => parseFloat(v) || 0;
+    const pt = num(cs.paddingTop), pb = num(cs.paddingBottom);
+    const pl = num(cs.paddingLeft), pr = num(cs.paddingRight);
+    if (!(pt || pb || pl || pr)) return; // no padding, nothing to show
+    // a wrapped inline has one padding box per line and no honest single box,
+    // so it gets no bands rather than a wash drawn over the wrong lines
+    if (el.getClientRects && el.getClientRects().length > 1) return;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return;
+    // computed values are unscaled CSS pixels while the rect is what the screen
+    // shows, so page zoom and a transformed ancestor ride in on this ratio
+    const sx = el.offsetWidth ? r.width / el.offsetWidth : 1;
+    const sy = el.offsetHeight ? r.height / el.offsetHeight : 1;
+    const bt = num(cs.borderTopWidth) * sy, bb = num(cs.borderBottomWidth) * sy;
+    const bl = num(cs.borderLeftWidth) * sx, brw = num(cs.borderRightWidth) * sx;
+    const t = pt * sy, b = pb * sy, l = pl * sx, rgt = pr * sx;
+    const innerW = Math.max(0, r.width - bl - brw);
+    const innerH = Math.max(0, r.height - bt - bb - t - b);
+    if (t) padBand(r.left + bl, r.top + bt, innerW, t, pt);
+    if (b) padBand(r.left + bl, r.bottom - bb - b, innerW, b, pb);
+    if (l) padBand(r.left + bl, r.top + bt + t, l, innerH, pl);
+    if (rgt) padBand(r.right - brw - rgt, r.top + bt + t, rgt, innerH, pr);
+  }
+
   function drawBands(el) {
     clearBands();
+    if (el) insideTheme = isDarkColor(backdropOf(el)) ? 'dark' : 'light';
+    drawPadding(el); // first, so it sits under the gaps between the children
     if (!el || kindOf(el) !== 'box') return;
     const kids = [...el.children]
       .filter((c) => c !== box && c !== bubble && !bands.includes(c) &&
@@ -613,7 +696,7 @@
         };
       }
       if (!geo) continue; // overlapping or wrapped pair: nothing to measure
-      addBand(geo, INSIDE_BAND);
+      addBand(geo, INSIDE_BAND, true);
     }
   }
 

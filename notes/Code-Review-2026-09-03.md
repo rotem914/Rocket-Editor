@@ -30,7 +30,7 @@ Fix:     move `flashTimer = 0` into the second build callback, beside unlockBubb
          owns the bubble until the facts are actually rebuilt. stopInspect already handles -1.
 Verify:  with the panel showing, keep the mouse moving as it returns: the facts may appear only
          through the rise-in, never mid-fade. In the probe, T1's hook must read the panel text.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ```
@@ -45,7 +45,7 @@ Fix:     two options. (a) In flash, return early when flashTimer === -1: the cop
          build callback, clear a still-pending hold timer before setting the new one. If the
          failure state must always win, keep the last `ok` in a variable the build reads.
 Verify:  double-click an element: one confirmation, one return. In the probe, T2 reports 1 and 1.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ```
@@ -60,7 +60,7 @@ Fix:     the first build callback returns early unless flashTimer === -1 (the st
          finish still calls place, which hides because there is no target.
 Verify:  click, release the key at once, press again within half a second: the hovered element's
          facts must show. In the probe, T3's re-press text starts with the element's tag.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ## 🟡 Nit
@@ -75,7 +75,7 @@ Problem: the comment promises the content is never left invisible, and the fade-
          with a 400ms cancel. Rare in real use: the key is held in a focused tab.
 Fix:     hold the rise-in animation and cancel it on a short timer, the way fadeGuard does.
 Verify:  run the probe with real animations in the hidden pane; content opacity must end at 1.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ```
@@ -86,7 +86,7 @@ Problem: computed grid-template-columns keeps line names in brackets, so
          7 tracks and prints `cols [full-start], 100px, ...`. Confirmed in the pane.
 Fix:     strip `[...]` tokens before splitting; treat `subgrid` as no track list.
 Verify:  a grid with named lines reads `3 cols` or the three widths only.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ```
@@ -98,7 +98,7 @@ Problem: a component name is page-controlled text (displayName can be any string
 Fix:     `lines.push('comp:    ' + flat(comp))`.
          Pre-existing, same gap: the file: line from sourceOf (line 1055).
 Verify:  every page-derived value in idCard passes through flat or ownWords.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ```
@@ -122,7 +122,7 @@ Problem: the flash comment still describes a pill in two colours; the five names
 Fix:     owner's call: delete the inert five and fix the two comments, or keep them and fix the
          comments only. Either way drop the no-op ternary.
 Verify:  syntax check; bubbleDisplay's one reader is place (line 491), which then reads 'block'.
-Status:  [ ] open
+Status:  [x] done, fixed in 28c9f59 and confirmed by the probe on 2026-09-03
 ```
 
 ## Pre-existing, flagged only
@@ -138,5 +138,5 @@ Fix:     move the fourteen scan rows verbatim up to the end of the scan table an
          blank line at 197. Verbatim, per the file's own rule. Not done here: rule 18, and the
          file is under edit by another session.
 Verify:  the scan table and the appendix table each render as one table.
-Status:  [ ] open, owner's verdict
+Status:  [x] done, the rows moved back in 28c9f59
 ```

@@ -67,6 +67,8 @@ Inside that ceiling, say the problem and the why — never a verdict alone.
 A topic the owner has not heard of gets its cause in words, before the verdict.
 Only the long evidence and the full check list go to the `project-os/History.md` row.
 The ceiling holds for EVERY reply, work behind it or not.
+An opinion, a recommendation and a design discussion are replies too.
+They get no extra room; more to say becomes numbered options (rule 8), never more prose.
 It lifts ONLY when the owner asks for a `full report`: 16 prose lines.
 Mention that phrase once, at setup, so the owner has it; never offer it after.
 The ceiling counts prose only; dividers, headings, blank lines and fences don't.

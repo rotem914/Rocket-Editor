@@ -60,7 +60,6 @@ Mistakes in HOW you worked:
 
 | Date | What Claude did | What Rotem wanted | Home if it repeats | Times |
 |---|---|---|---|---|
-| 2026-08-30 | Wrote long multi-section replies through a whole Q&A session, ignoring the existing 3-line ceiling, until Rotem demanded an 80% cut | The short default that is already rule 1 of Conversations.md. The ceiling holds even when the topic feels big | Already law; on repeat, tighten rule 1 wording | 1 |
 | 2026-09-01 | He said the digits were moving in front of his eyes; that was the product's bubble flickering, and it was read as a complaint about the length of the replies. A defect report was filed as a style correction | When a comment could be about the product or about the reply, it is about the product. Ask before recording it as a correction | Already law in spirit; on repeat, write it into Conversations.md | 1 |
 | 2026-08-30 | Turned a request about the current task, ask the open decisions one at a time, into a permanent working rule in the reply-format file | Do the thing that was asked, for the case it was asked about. A working preference becomes a standing rule only when Rotem says it is one | CLAUDE.md rule 18 | 1 |
 | 2026-08-30 | Wrote a shell command whose text contained backticks and passed it unquoted, so the shell substituted them and executed their contents. One was a git checkout, which silently reverted this very file and undid the project rename inside it | Multi-line content with backticks, quotes or apostrophes goes in a file the script reads, never inline in a shell argument. That is the pattern already used for History rows | project-os/Workflow.md step 7 | 1 |
@@ -71,6 +70,7 @@ Mistakes in HOW you worked:
 |---|---|---|
 | 2026-08-30 | Wrote for a designer in developer terms. Twice: first a whole report named internal parts without saying what they are, then a decision question gave three options with no explanation of what was being decided or what changed for him | `project-os/Conversations.md` rule 14, which gained a clause requiring every decision question to carry what the thing is, what it does for him, and what changes by his answer, before the options |
 | 2026-08-31 | Read a finished-sounding spec discussion as a build order and started writing files, twice in one day | `CLAUDE.md` rule 1, "A discussion is not a work order" |
+| 2026-09-03 | Long multi-section replies, a second time: a design discussion ran to five sections with long dashes throughout, when the ceiling was three lines | `project-os/Conversations.md` rule 1, which now names opinions and design talk as replies under the same ceiling |
 
 ## Retired
 
