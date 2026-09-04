@@ -22,6 +22,8 @@ The owner-curated open-items list. One place to see what is still open.
 
 | Added | Item | Source |
 |---|---|---|
+| 2026-09-04 | Inspector: an overlay that really paints, like the gradient a card lays over its picture on hover, still hides what is under it; skipping it would hide something a person can see, so it needs a deliberate way through | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
+| 2026-09-04 | Inspector bubble: say `Canvas` for a canvas element, since everything drawn inside one has no elements to point at and a bare size explains nothing | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
 | 2026-09-03 | Inspector bubble: show the variable behind a value, `#2D41D7 · --primary`, read from the matched rule, so Claude gets the real address and not a hex | Chat, 2026-09-03, the designer's-hat pass over the Inspector bubble, all nine backlogged at once |
 | 2026-09-03 | Inspector bubble: a layout line for a container, `Flex row · gap 12` or `Grid 3 cols · gap 16/24`, so spacing research does not need the copied card | Chat, 2026-09-03, the designer's-hat pass over the Inspector bubble, all nine backlogged at once |
 | 2026-09-03 | Inspector bubble: uppercase, italic, underline, alignment and opacity, one line each and only when set, so the bubble says what the eye sees | Chat, 2026-09-03, the designer's-hat pass over the Inspector bubble, all nine backlogged at once |

@@ -1006,7 +1006,7 @@
     mount();
     if (lastX >= 0) {
       const el = document.elementFromPoint(lastX, lastY);
-      if (el) target = el;
+      if (el) target = resolveTarget(el, lastX, lastY);
     }
     paint();
   }
@@ -1060,6 +1060,132 @@
     const clipped = cut.length > 80 ? cut.slice(0, 80).trim() : cut;
     // a quote inside the excerpt would break the card's own quoting
     return clipped.replace(/"/g, "'") + (words.length > max || clipped !== cut ? ' …' : '');
+  }
+
+  // A stretched link, or any invisible click layer: it paints nothing of its
+  // own and covers nearly all of its parent, so it hides every real element
+  // under it from the picker. The tool steps under it and the card names it.
+  // How much of its parent an element's box takes up. A cover is judged on this,
+  // never on its own size, so a small box in a huge container is never one.
+  function coverRatio(el) {
+    const r = el.getBoundingClientRect();
+    const host = el.parentElement || (el.ownerSVGElement || null);
+    if (!host || !host.getBoundingClientRect) return 0;
+    const pr = host.getBoundingClientRect();
+    const area = r.width * r.height;
+    const parentArea = pr.width * pr.height;
+    if (area <= 0 || parentArea <= 0) return 0;
+    return area / parentArea;
+  }
+
+  // A shape inside an SVG that catches the mouse for a whole chart: it fills
+  // nothing and covers the drawing, so every bar under it reads as the shape.
+  function isSvgCover(el) {
+    if (!el.ownerSVGElement) return false;             // the <svg> itself is a real element
+    const cs = getComputedStyle(el);
+    const fill = cs.fill;
+    const painted = fill && fill !== 'none' && !isTransparent(fill) && parseFloat(cs.fillOpacity || '1') > 0;
+    const stroked = cs.stroke && cs.stroke !== 'none' && !isTransparent(cs.stroke);
+    if (painted || stroked) return false;
+    if (visibleText(el).trim()) return false;
+    return coverRatio(el) >= 0.9;
+  }
+
+  function isCoverOverlay(el) {
+    if (!el || !el.getBoundingClientRect) return false;
+    if (isSvgCover(el)) return true;
+    if (!el.parentElement) return false;
+    const cs = getComputedStyle(el);
+    if (cs.position !== 'absolute' && cs.position !== 'fixed') return false;
+    // invisible at rest, whatever it would paint if it were shown
+    if (parseFloat(cs.opacity) === 0) return coverRatio(el) >= 0.9;
+    if (!isTransparent(cs.backgroundColor)) return false;
+    if (cs.backgroundImage && cs.backgroundImage !== 'none') return false;
+    if (cs.boxShadow && cs.boxShadow !== 'none') return false;
+    if (borderLabel(cs, el)) return false;
+    if (visibleText(el).trim()) return false;
+    return coverRatio(el) >= 0.9;
+  }
+
+  // Bootstrap's stretched-link and Tailwind's after:inset-0 stretch a link with
+  // a pseudo-element, so the LINK stays small and its own box does not hold the
+  // cursor at all. Nothing else does that, which makes it a precise signal.
+  function coversByPseudo(el, x, y) {
+    if (!el || !el.getBoundingClientRect || x < 0) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return false;
+    if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return false;
+    for (const which of ['::after', '::before']) {
+      const ps = getComputedStyle(el, which);
+      if (!ps || ps.content === 'none' || ps.content === 'normal') continue;
+      if (ps.position === 'absolute' || ps.position === 'fixed') return true;
+    }
+    return false;
+  }
+
+  // What was stepped under, remembered for the copied card only.
+  let coveredEl = null;
+  let coverEl = null;
+
+  // Hit testing answers with what would receive the click, so a card that turns
+  // pointer events off on its own title hides that title from it entirely.
+  // Under a cover the picker therefore descends by geometry: the deepest box
+  // that really contains the cursor, which is what the eye is pointing at.
+  function deepestAt(root, x, y) {
+    let best = root;
+    const walk = (node, depth) => {
+      if (depth > 12) return;
+      const kids = [...node.children];
+      // an open web component keeps its real elements in a shadow tree, which is
+      // not a child of anything: the descent has to step into it explicitly
+      if (node.shadowRoot) kids.push(...node.shadowRoot.children);
+      for (const c of kids) {
+        if (c === box || c === bubble) continue;
+        const cs = getComputedStyle(c);
+        if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+        const r = c.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) continue;
+        if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+        if (!isCoverOverlay(c)) best = c;
+        walk(c, depth + 1);
+      }
+    };
+    walk(root, 0);
+    return best;
+  }
+
+  function resolveTarget(el, x, y) {
+    if (!(el instanceof Element)) return el;
+    if (!isCoverOverlay(el)) {
+      if (coversByPseudo(el, x, y)) {
+        const host = el.parentElement;
+        if (host) {
+          const deep = deepestAt(host, x, y);
+          coveredEl = deep;
+          coverEl = el;
+          return deep;
+        }
+      }
+      if (coveredEl !== el) { coveredEl = null; coverEl = null; }
+      return el;
+    }
+    const stack = (x >= 0 && document.elementsFromPoint) ? document.elementsFromPoint(x, y) : [];
+    let cover = el;
+    let under = null;
+    for (const n of stack) {
+      if (n === box || n === bubble || bubble.contains(n)) continue;
+      if (isCoverOverlay(n)) { cover = n; continue; }
+      under = n;
+      break;
+    }
+    // nothing real came back: the page switched pointer events off under the
+    // cover, so the container that holds it is where the descent starts
+    if (!under) under = cover.parentElement;
+    if (!under) return el;
+    const deep = deepestAt(under, x, y);
+    coveredEl = deep;
+    coverEl = cover;
+    return deep;
   }
 
   function nameOf(el) {
@@ -1246,6 +1372,14 @@
         lines.push('parent:  ' + nameOf(p) + ' ' + Math.round(pr.width) + ' × ' + Math.round(pr.height) +
           ' · padding ' + sidesLabel(pcs, 'padding') + (pl ? ' · ' + pl : ''));
       }
+      // an invisible layer covers this element and takes its clicks: the
+      // executor needs to know, since it is what a person actually clicks
+      if (coveredEl === el && coverEl) {
+        const label = coverEl.getAttribute && coverEl.getAttribute('aria-label');
+        lines.push('overlay: ' + tagName(coverEl) +
+          (classesOf(coverEl) ? ' · ' + classesOf(coverEl) : '') +
+          (label ? ' · aria-label=' + label : '') + ' · covers this element');
+      }
       if (kindOf(el) === 'text') {
         const t = textStyleSource(el);
         const tcs = t === el ? cs : getComputedStyle(t);
@@ -1356,9 +1490,9 @@
     lastX = e.clientX;
     lastY = e.clientY;
     if (!inspecting) return;
-    const el = e.composedPath ? e.composedPath()[0] : e.target;
-    if (el instanceof Element && el !== box && el !== bubble && !bubble.contains(el)) {
-      aimAt(el);
+    const hit = e.composedPath ? e.composedPath()[0] : e.target;
+    if (hit instanceof Element && hit !== box && hit !== bubble && !bubble.contains(hit)) {
+      aimAt(resolveTarget(hit, e.clientX, e.clientY));
     }
     paint();
   }, true);
@@ -1381,8 +1515,9 @@
     if (!inspecting) return;
     e.preventDefault();
     e.stopImmediatePropagation();
-    const el = e.composedPath ? e.composedPath()[0] : e.target;
-    const pick = (el instanceof Element && el !== box && !bubble.contains(el)) ? el : target;
+    const hit = e.composedPath ? e.composedPath()[0] : e.target;
+    const pick = (hit instanceof Element && hit !== box && !bubble.contains(hit))
+      ? resolveTarget(hit, e.clientX, e.clientY) : target;
     if (!pick) return;
     copyText(idCard(pick)).then((ok) => flash(ok));
   }, true);
