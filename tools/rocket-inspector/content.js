@@ -83,8 +83,23 @@
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
+  // A form field's words live in a value or a placeholder, never in a child
+  // node, so the text test below never saw one and a field lost its whole type
+  // group. The switches and pickers stay out: their font means nothing.
+  const FIELD_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password',
+    'number', 'date', 'time', 'datetime-local', 'month', 'week', 'submit', 'button', 'reset']);
+
+  function isTextField(el) {
+    const tag = TAG_UP(el);
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    const t = ((el.getAttribute && el.getAttribute('type')) || 'text').toLowerCase();
+    return FIELD_TYPES.has(t);
+  }
+
   function kindOf(el) {
     if (IMAGE_TAGS.has(TAG_UP(el))) return 'image';
+    if (isTextField(el)) return 'text';
     if (hasOwnText(el) || (TEXT_TAGS.has(TAG_UP(el)) && (el.textContent || '').trim())) return 'text';
     return 'box';
   }
@@ -117,6 +132,7 @@
   // sees: itself when it holds its own text, otherwise its first text-bearing
   // descendant, because a wrapper's inherited font is not what got painted.
   function textStyleSource(el) {
+    if (isTextField(el)) return el; // a field's own style is the style of its words
     if (hasOwnText(el)) return el;
     let node = el.firstElementChild;
     for (let guard = 0; node && guard < 40; guard++) {
@@ -471,7 +487,7 @@
     }
 
     gap();
-    if (kind !== 'text') row(size);
+    row(size); // every kind, text included: the box is a fact he needs
     if (kind === 'box') spacingRow('Margin', 'margin');
     if (kind !== 'image') spacingRow('Padding', 'padding');
 
