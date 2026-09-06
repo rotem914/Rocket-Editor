@@ -22,6 +22,7 @@ The owner-curated open-items list. One place to see what is still open.
 
 | Added | Item | Source |
 |---|---|---|
+| 2026-09-06 | Inspector: a wrapper holding a single child is easy to hover and says nothing, while the child that holds the real spacing can be unreachable when it is exactly as tall as its own contents; consider handing the hover to that single child | Chat, 2026-09-06, the tab row whose 8px gaps appeared to be missing |
 | 2026-09-04 | Inspector: an overlay that really paints, like the gradient a card lays over its picture on hover, still hides what is under it; skipping it would hide something a person can see, so it needs a deliberate way through | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
 | 2026-09-04 | Inspector bubble: say `Canvas` for a canvas element, since everything drawn inside one has no elements to point at and a bare size explains nothing | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
 | 2026-09-03 | Inspector bubble: show the variable behind a value, `#2D41D7 · --primary`, read from the matched rule, so Claude gets the real address and not a hex | Chat, 2026-09-03, the designer's-hat pass over the Inspector bubble, all nine backlogged at once |

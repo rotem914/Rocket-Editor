@@ -690,29 +690,40 @@
     if (el && kindOf(el) !== 'image') drawPadding(el); // first, so it sits under the gaps between the children
     if (!el || kindOf(el) !== 'box') return;
     const kids = [...el.children]
-      .filter((c) => c !== box && c !== bubble && !bands.includes(c) &&
-        c.getBoundingClientRect && getComputedStyle(c).display !== 'none')
+      .filter((c) => {
+        if (c === box || c === bubble || bands.includes(c) || !c.getBoundingClientRect) return false;
+        const ccs = getComputedStyle(c);
+        // a positioned child floats above the rhythm rather than taking part in
+        // it, and an active-tab indicator sitting between two chips used to kill
+        // both of their gaps
+        return ccs.display !== 'none' && ccs.position !== 'absolute' && ccs.position !== 'fixed';
+      })
       .map((c) => c.getBoundingClientRect())
       .filter((r) => r.width > 0 && r.height > 0);
     for (let i = 0; i < kids.length - 1; i++) {
       const a = kids[i];
       const b = kids[i + 1];
+      // the pair can run either way: a right-to-left row, or a reversed
+      // direction, puts the second child before the first and the space
+      // between them is just as real
+      const down = Math.max(b.top - a.bottom, a.top - b.bottom);
+      const across = Math.max(b.left - a.right, a.left - b.right);
       let geo = null;
-      if (b.top - a.bottom >= 1) {
+      if (down >= 1) {
         geo = {
-          left: Math.min(a.left, b.left), top: a.bottom,
+          left: Math.min(a.left, b.left), top: Math.min(a.bottom, b.bottom),
           width: Math.max(a.right, b.right) - Math.min(a.left, b.left),
-          height: b.top - a.bottom, gap: b.top - a.bottom,
+          height: down, gap: down,
         };
-      } else if (b.left - a.right >= 1) {
+      } else if (across >= 1) {
         geo = {
-          left: a.right, top: Math.min(a.top, b.top),
-          width: b.left - a.right,
+          left: Math.min(a.right, b.right), top: Math.min(a.top, b.top),
+          width: across,
           height: Math.max(a.bottom, b.bottom) - Math.min(a.top, b.top),
-          gap: b.left - a.right,
+          gap: across,
         };
       }
-      if (!geo) continue; // overlapping or wrapped pair: nothing to measure
+      if (!geo) continue; // overlapping pair: nothing to measure
       addBand(geo, INSIDE_BAND, true);
     }
   }
