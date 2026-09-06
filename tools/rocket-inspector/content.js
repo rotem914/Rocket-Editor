@@ -545,14 +545,15 @@
     const bw = bubble.offsetWidth;
     const above = outTopEdge !== null ? outTopEdge : r.top;
     const below = outBottomEdge !== null ? outBottomEdge : r.bottom;
-    // Above the element; else below it when that fits on screen; else pinned to
-    // the top, which is where a taller-than-the-window element leaves it.
+    // Clear of the measuring bands first, then clear of the element itself,
+    // and only then pinned. A band can reach far down a long page, so insisting
+    // on clearing it used to strand the bubble at the top, over the element.
+    const fits = (t) => t >= 4 && t + bh <= innerHeight - 4;
     let top = above - bh - 8;
-    if (top < 4) {
-      const under = below + 8;
-      top = (under + bh <= innerHeight - 4) ? under : 4;
-    }
-    bubble.style.top = top + 'px';
+    if (!fits(top)) top = below + 8;
+    if (!fits(top)) top = r.top - bh - 8;
+    if (!fits(top)) top = r.bottom + 8;
+    if (!fits(top)) top = 4;
     // The bubble rides the cursor's X, centered on it, clamped to the viewport.
     // To the cursor's right, so the cursor itself is never covered; flips to
     // its left only when the right side has no room.
@@ -565,7 +566,19 @@
     } else {
       left = r.left;
     }
-    bubble.style.left = Math.max(4, Math.min(left, innerWidth - bw - 8)) + 'px';
+    left = Math.max(4, Math.min(left, innerWidth - bw - 8));
+    // Last word, above every rule before it: the bubble never sits on the
+    // cursor. It hides the element being measured, which is the one thing the
+    // tool exists to show.
+    if (lastX >= 0 &&
+        lastX >= left - 2 && lastX <= left + bw + 2 &&
+        lastY >= top - 2 && lastY <= top + bh + 2) {
+      if (fits(lastY + 16)) top = lastY + 16;
+      else if (fits(lastY - bh - 16)) top = lastY - bh - 16;
+      else left = (lastX - bw - 16 >= 4) ? lastX - bw - 16 : Math.min(lastX + 16, innerWidth - bw - 4);
+    }
+    bubble.style.top = top + 'px';
+    bubble.style.left = left + 'px';
   }
 
   const INSIDE_BAND = 'rgba(222, 180, 117, 0.32)';  // internal spacing: gaps between
