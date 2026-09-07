@@ -589,6 +589,10 @@
   // a light sand over a dark one, judged per paint from what sits behind the element.
   const INSIDE_INK = { light: '#6F5A3A', dark: '#F0D6AA' };
   const INSIDE_HALO = { light: '#DFC9A6', dark: 'rgba(0, 0, 0, 0.75)' };
+  // The pill's own size, estimated rather than measured: reading it back would
+  // force a layout on every scroll, and the digits are a known 12px face.
+  const CHIP_H = 21;                                  // 12px on a 1.4 line, plus 2px of padding each side
+  const chipWidth = (label) => label.length * 7 + 16; // per digit, plus 8px of padding each side
   let insideTheme = 'light';
 
   function clearBands() {
@@ -640,11 +644,30 @@
       bandNumber(geo.left, geo.top, geo.width, geo.height, String(Math.round(geo.gap)));
       return;
     }
+    // The pill sits outside the element's outline, never across it. Centred on
+    // a band thinner than the pill, it used to reach inside and cover the
+    // padding number there, which is exactly the case a small control is.
+    // Last word on that: the screen. Pushed outward off the top of a page, the
+    // number would be worth nothing, so it comes back inside just far enough to
+    // be read, over the element if that is the only place left.
+    const label = String(Math.round(geo.gap));
+    const cw = chipWidth(label);
+    let cx = geo.left + geo.width / 2;
+    let cy = geo.top + geo.height / 2;
+    if (geo.side === 'top') {
+      cy = Math.max(Math.min(cy, geo.top + geo.height - CHIP_H / 2), CHIP_H / 2 + 2);
+    } else if (geo.side === 'bottom') {
+      cy = Math.min(Math.max(cy, geo.top + CHIP_H / 2), innerHeight - CHIP_H / 2 - 2);
+    } else if (geo.side === 'left') {
+      cx = Math.max(Math.min(cx, geo.left + geo.width - cw / 2), cw / 2 + 2);
+    } else if (geo.side === 'right') {
+      cx = Math.min(Math.max(cx, geo.left + cw / 2), innerWidth - cw / 2 - 2);
+    }
     const chip = document.createElement('div');
-    chip.textContent = String(Math.round(geo.gap));
+    chip.textContent = label;
     Object.assign(chip.style, {
       position: 'fixed', zIndex: '2147483646', pointerEvents: 'none',
-      left: (geo.left + geo.width / 2) + 'px', top: (geo.top + geo.height / 2) + 'px',
+      left: cx + 'px', top: cy + 'px',
       transform: 'translate(-50%, -50%)',
       background: BUBBLE_BG, color: '#f3f4f6',
       font: "12px/1.4 'Google Sans', 'Product Sans', Roboto, Arial, sans-serif",
@@ -772,18 +795,18 @@
     const overlapY = (s) => Math.min(s.bottom, r.bottom) > Math.max(s.top, r.top);
 
     const DIRS = [
-      { wall: (p) => p.top, best: Math.max, dist: (e) => r.top - e,
+      { wall: (p) => p.top, best: Math.max, dist: (e) => r.top - e, side: 'top',
         pick: (s) => (overlapX(s) && s.bottom <= r.top + 0.5) ? s.bottom : null,
         remember: (e) => { outTopEdge = e; },
         geo: (e) => ({ left: r.left, top: e, width: r.width, height: r.top - e, gap: r.top - e }) },
-      { wall: (p) => p.bottom, best: Math.min, dist: (e) => e - r.bottom,
+      { wall: (p) => p.bottom, best: Math.min, dist: (e) => e - r.bottom, side: 'bottom',
         pick: (s) => (overlapX(s) && s.top >= r.bottom - 0.5) ? s.top : null,
         remember: (e) => { outBottomEdge = e; },
         geo: (e) => ({ left: r.left, top: r.bottom, width: r.width, height: e - r.bottom, gap: e - r.bottom }) },
-      { wall: (p) => p.left, best: Math.max, dist: (e) => r.left - e,
+      { wall: (p) => p.left, best: Math.max, dist: (e) => r.left - e, side: 'left',
         pick: (s) => (overlapY(s) && s.right <= r.left + 0.5) ? s.right : null,
         geo: (e) => ({ left: e, top: r.top, width: r.left - e, height: r.height, gap: r.left - e }) },
-      { wall: (p) => p.right, best: Math.min, dist: (e) => e - r.right,
+      { wall: (p) => p.right, best: Math.min, dist: (e) => e - r.right, side: 'right',
         pick: (s) => (overlapY(s) && s.left >= r.right - 0.5) ? s.left : null,
         geo: (e) => ({ left: r.right, top: r.top, width: e - r.right, height: r.height, gap: e - r.right }) },
     ];
@@ -803,7 +826,7 @@
         }
         if (touching) break;
         if (dir.dist(edge) >= 3) {
-          pending.push(dir.geo(edge));
+          pending.push(Object.assign(dir.geo(edge), { side: dir.side }));
           if (dir.remember) dir.remember(edge);
           break;
         }
