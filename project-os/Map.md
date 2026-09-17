@@ -40,7 +40,7 @@ The whole project as it stands today.
 
 ```text
 Rocket Editor/
-├── .gitignore             # keeps the .tmp/ scratch folder out of git
+├── .gitignore             # keeps the .tmp/ scratch folder and the backups/ ZIPs out of git
 ├── CLAUDE.md              # entry file, read first
 ├── notes/                 # free-standing documents
 │   ├── Rocket-Editor-Plan.md          # the product plan: phases, research, open decisions
@@ -62,6 +62,7 @@ Rocket Editor/
 │   ├── Visual_QA.md       # how the running app gets used and tested
 │   ├── BugAtlas.md        # recurring bug classes
 │   ├── Mistakes.md        # corrections waiting to become rules
+│   ├── backup.ps1         # the `Go backup` snapshot script, writes a verified ZIP to backups/
 │   └── mcp/               # per-server rules, read before the first call
 │       ├── Figma/
 │       └── Google_analytics/
