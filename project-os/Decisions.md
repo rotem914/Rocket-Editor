@@ -51,7 +51,7 @@ would make it worth revisiting.
 Every decision below, oldest first. Read this list; open only the entries your
 task touches. A line in _italics_ means part of that entry no longer holds.
 
-- 2026-08-27 — Rocket Editor is a local web app, not a desktop app
+- _2026-08-27 — Rocket Editor is a local web app, not a desktop app_
 - 2026-08-27 — Writing into an attached client folder is the one sanctioned write outside this project
 - 2026-08-30: The first release is the real interface, not an interim theme editor
 - 2026-08-30: A value outside the project's scale is accepted immediately and stays local
@@ -65,11 +65,12 @@ task touches. A line in _italics_ means part of that entry no longer holds.
 - 2026-08-30: Calibration runs on Rotem's three own systems first, then downloaded public projects
 - _2026-08-30: The labelling tool lives in Rocket's own folder, so the client's dependency list is untouched_
 - _2026-08-30: The first version applies one change at a time; batching waits for a later version_
-- 2026-08-30: The lean pivot. Rocket is read-only everywhere, and Claude Code makes the code changes from its report
+- _2026-08-30: The lean pivot. Rocket is read-only everywhere, and Claude Code makes the code changes from its report_
 - 2026-08-30: The unit of handoff is a small group of related changes, sent mid-session; the full report is history
 - 2026-08-30: The control list grows to fifteen: font weight, letter spacing, border width and shadow join
 - 2026-08-31: The class-copy extension copies an element ID card, not the bare class
 - 2026-09-03: The bubble reads in four fixed groups, with no headers
+- 2026-09-23: The helper arrives through a Chrome extension; the pasted line stays as the backup
 
 ---
 
@@ -961,3 +962,87 @@ group it belongs to, or it needs a fifth group and this entry gets a successor.
 
 Revisit if the tool ships to people who read it cold and cannot tell the groups
 apart, which is the case option 2 was written for.
+
+---
+
+## 2026-09-23: The helper arrives through a Chrome extension; the pasted line stays as the backup
+
+### Context
+
+Rocket needs a small helper running inside the client's page to highlight,
+select, read rendered values and preview. The lean pivot had Rotem paste one
+line into the client's root layout and delete it at the end, guarded by a
+permanent indicator and a read-only clean check, because the architecture held
+that browser walls made any other way impossible.
+
+That held for a web page, the panel, and was never true for a browser
+extension, which the browser lets into any page. No option list ever weighed
+one, though Rocket Inspector already was one. The route surfaced from the
+canvas-capture review on 2026-09-23. A research pass against Chrome's own
+documentation, then two skeptics, found no showstopper on Rotem's own Chrome.
+
+### Options
+
+1. Keep the pasted line as the only route.
+2. Switch to a helper extension, keeping the pasted line only as a backup.
+3. Test the extension for half a day on this machine first, then decide.
+
+### Decision
+
+Option 2. Rotem, 2026-09-23. It replaces the lean pivot's second sub-decision,
+the hand-pasted line as the only route, and the 2026-08-27 consequence that
+there is nothing to install; both index lines are now italic. The indicator
+and the clean check carry on for the backup.
+
+The design it carries comes from the research pass and its skeptics, not from a
+separate ruling by Rotem. The helper extension is its own small extension, not
+part of Rocket Inspector. Chrome lets it into every localhost page, on any
+port, and it stays dormant unless the page is framed by Rocket's panel; a
+127.0.0.1 site is steered to localhost, as the login design requires. It
+changes nothing on the page until the page has loaded and gone quiet, and it
+talks to the panel only through the extension, which lets in only the panel's
+exact address. The pasted line and its clean check remain for a Chrome that
+forbids the extension, and for other browsers.
+
+### Consequences
+
+Nothing of Rocket enters the client's code on the main route: no paste, no
+delete, nothing that can slip into a pushed branch. The channel between helper
+and panel becomes private, so a script on the client's page can no longer fake
+the helper's messages, as long as the panel's exact address, port included, is
+the only one let in and the helper listens for no page messages. What the
+helper reads from the page stays untrusted data, as before.
+
+Rocket becomes three parts, and the 2026-08-27 promise of nothing to install no
+longer holds whole. Rotem loads the extension once per Chrome profile and keeps
+Chrome's developer mode on for good, since an unpacked extension stops working
+without it; while it is being built he reloads it by hand after each change.
+Installing it is his own click, recorded by Chrome like any extension; the
+assistant reads that as leaving the iron rule intact, and Rotem has not yet
+ruled on that reading. The extension itself writes no file.
+
+It also gives Rocket a standing reach into every localhost page in Rotem's
+everyday Chrome, held back only by the dormancy check. And the panel's fixed
+port becomes what the helper trusts: a program holding that port while Rocket is
+down could frame any local site and wake the helper there. Unlikely, but the
+reach is wide, so it is named here.
+
+Three things the pasted line gave for free now need their own mechanism: a
+sign that the framed site is the attached project, now a search for its visible
+words in the project; a reminder that a helper is present, now the indicator
+naming its route; and the disclosure wording, which now says the helper runs in
+Rotem's browser, on local development addresses, only inside Rocket. Nothing in
+the client's folder prompts the disclosure any more; whether the panel should
+offer it at a project's first attach is Rotem's call.
+
+The assistant's built-in browser cannot load extensions, so the helper is tested
+through Rotem's real Chrome, or as a page script on a test page.
+
+Two further uses of the same extension stay out of this decision: lifting a
+client site's refusal to be framed, open decision 3 in the architecture, and
+reading which style rule paints a value through the browser's debugging access.
+Each weakens the passive posture in its own way and needs its own ruling.
+
+Revisit if R-07 fails any of its three first proofs, or if a client engagement
+puts Rotem on a Chrome that forbids extensions, which would make the backup the
+main route again.

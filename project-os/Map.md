@@ -46,10 +46,11 @@ Rocket Editor/
 │   ├── Rocket-Editor-Plan.md          # the product plan: phases, research, open decisions
 │   ├── Rocket-Editor-Architecture.md  # the lean product: read-only Rocket, Claude writes
 │   ├── Rocket-Editor-Writing-Track.md # superseded full architecture, kept as dated spec
-│   ├── Rocket-Editor-Build-Plan.md   # 32 small tasks, each ending in an owner check
+│   ├── Rocket-Editor-Build-Plan.md   # 35 small tasks, each ending in an owner check
 │   ├── Rocket-Editor-Review-Pack-2026-08-30.md  # the whole plan compressed for outside AI reviewers
 │   ├── Plan-Review-2026-08-30.md      # findings against the plan, awaiting owner verdicts
-│   └── Decision-Verification-2026-08-30.md  # every decision checked against the world, plus the questions list
+│   ├── Decision-Verification-2026-08-30.md  # every decision checked against the world, plus the questions list
+│   └── Canvas-Capture-Lessons-2026-09-23.md  # what an outside repo teaches Rocket, every lesson with its evidence
 ├── project-os/            # the process docs
 │   ├── Workflow.md        # the path every task walks
 │   ├── Map.md             # this file
@@ -94,9 +95,10 @@ anything.
 | Plan | `notes/Rocket-Editor-Plan.md` | The product plan. A plan, never a description of what exists; nothing here is built until it lands as code. |
 | Architecture | `notes/Rocket-Editor-Architecture.md` | The lean product: read-only Rocket, browser-held session record, report to Claude Code. A proposal; ratified choices move to `project-os/Decisions.md`. |
 | Writing track | `notes/Rocket-Editor-Writing-Track.md` | The superseded full architecture, kept unedited as the dated spec for a version where Rocket writes code. |
-| Build plan | `notes/Rocket-Editor-Build-Plan.md` | The lean product broken into 32 small tasks, each with the owner check that closes it. |
+| Build plan | `notes/Rocket-Editor-Build-Plan.md` | The lean product broken into 35 small tasks, each with the owner check that closes it. |
 | Review pack | `notes/Rocket-Editor-Review-Pack-*.md` | Self-contained compression of the whole plan for external AI review, one file per round. |
 | Plan reviews | `notes/Plan-Review-*.md` | Findings from a requested review of the plan docs, one file per pass, awaiting owner verdicts. |
 | Decision verification | `notes/Decision-Verification-*.md` | Research-backed verdicts on the architecture decisions, and the owner questions list. |
+| Outside repo lessons | `notes/Canvas-Capture-Lessons-*.md` | Lessons from an outside repository Rotem named, read under rule 21's exception; reference, with only the lessons he adopted carried into the plan. |
 | Helper tools | `tools/rocket-inspector/*` | Rocket Inspector, a standalone Chrome extension: hold the key left of 1 on any tab, hover for design facts and spacing rulers, click to copy an element ID card for Claude. A helper, not the app; the app rows above stay empty. |
 | Application | none yet | Fill this in with the first real code. |

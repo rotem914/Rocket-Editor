@@ -99,6 +99,12 @@ change no files, however finished the idea sounds. Building starts only when
 Rotem says build in so many words, or approves a written plan. (Promoted from
 `project-os/Mistakes.md` after the same slip twice, 2026-08-31.)
 
+**A constraint is a claim until it is checked.** Before an option is set aside
+because a platform limit, a technical claim or an earlier assumption seems to
+forbid it, run the check in `project-os/Workflow.md` step 5, 'Check every
+"impossible" before it shapes the plan'. (Written from Rotem's correction,
+2026-09-23.)
+
 ### 2. Smallest safe change wins
 
 Prefer the smallest isolated change that solves the task. No side refactors, no

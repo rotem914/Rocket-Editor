@@ -103,6 +103,28 @@ Practical and short. A three-line plan is fine. No plan is not.
 
 Why: a plan written before the code is a prediction, so it can turn out wrong and teach you something. A summary written afterwards only ever agrees with what you did.
 
+### Check every "impossible" before it shapes the plan
+
+Some options get dropped because something seems to forbid them: a platform limit, a technical claim, an assumption carried over from an earlier doc. Before such an option leaves the table, and before you write that a route is impossible, unavoidable or the only way:
+
+1. Name the constraint in one sentence.
+2. Say where it comes from. Checked means documentation or a probe backs it. Inherited means a doc, a memory or a habit says so, and inherited is unchecked.
+3. Say which route it limits. A limit belongs to a route, not to the goal. "A web page cannot reach into a page on another address" limits web pages, not browser extensions. Ask what other route reaches the same goal.
+4. Look at what the project already has before concluding that nothing gets there. A route that needs anything the project lacks is a question for Rotem, never a search in another project (`CLAUDE.md` rule 21).
+5. If the option still goes, write the reason down with the routes that were checked, in the plan or the Decisions entry that drops it.
+
+An option dropped for cost, taste or scope skips this check.
+
+The same check runs when new work builds on an old claim. A written "impossible", "unavoidable" or "only way" that names no checked routes counts as unchecked, so check it before leaning on it. A ruling of Rotem's that rests on such a claim still gets the claim checked; the ruling stays his to change, so bring him what the check found when it weakens the claim.
+
+A route found is brought to Rotem as an option. It changes no plan, file or scope on its own.
+
+No rule in `CLAUDE.md` or `project-os/`, no ruling of Rotem's, and no permission or sandbox limit on your own tools is a constraint to route around, whatever reason it gives. When one of them blocks a better option, say so and ask. Switching to another tool you are allowed to use is not routing around (`CLAUDE.md` rule 6); evading the limit itself is.
+
+This applies to design talk and recommendations in chat too, not only to tasks that change files. In chat, work through the steps without writing them out: the reply carries only the result, within `project-os/Conversations.md` rule 1, and step 5's record is written only if the talk becomes a plan or a Decisions entry.
+
+Why: the architecture called a line in the client's code unavoidable because browser walls forbade anything else. The wall was real for the panel, which is a web page, and it was carried for days as if it held for every route, while the project's own Chrome extension already went through it. The better route surfaced only by accident, from an outside repository.
+
 ## 6. Design the QA before you write code
 
 Decide how you will prove this works *before* it exists. Otherwise QA gets invented at the end to match whatever you happened to build, and it only ever confirms your own assumptions.

@@ -411,6 +411,31 @@ that thing sits on the owner's screen, fails the same way: the owner knows the
 product deeply, so an explanation that needs three retries was built without
 context, not received without skill.
 
+**The check before sending.** List every product term in the reply that the
+owner has not used himself in this conversation: a feature's name, a state, a
+part of the product, a mechanism behind it, or an everyday word carrying a
+meaning this project gave it, such as fingerprint or landed. His words count in
+either language; when his earlier messages are not in view, count the term as
+unused. The project's own documents do not count as his words, because
+approving a document weeks ago is not remembering its vocabulary today.
+Each listed term either gives way to what it does on screen, or gets one line
+saying what it is before it is used. A comparison gets a concrete example in
+words that the owner can picture, never two abstract descriptions side by side.
+The list is made silently, never shown. Swapping a term for plain words costs
+no line, so prefer it; a what-it-is line or an example counts toward rule 1's
+ceiling, and when it does not fit, drop a topic, never the explanation.
+
+~~~
+Never:
+Rocket hands Claude a list of changes with fingerprints, then checks that each
+one landed.
+
+Instead:
+Say you darken a blue button.
+Rocket tells Claude which button, on which page, next to which words.
+After Claude's edit, Rocket looks at the site and confirms the button is darker.
+~~~
+
 ~~~
 Never:
 Purge the orphaned pre-migration blobs?

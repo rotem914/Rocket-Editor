@@ -1569,7 +1569,39 @@
     if (!inspecting) return;
     e.preventDefault();
     e.stopImmediatePropagation();
+    if (e.type === 'pointerdown') copyFromScrollbar(e);
   };
+
+  // A press on an element's own scrollbar reaches the page as a pointerdown and
+  // nothing after it: no mouseup, no click. On a sidebar whose links fill it, the
+  // scrollbar is the only place the sidebar itself can be pointed at, so that
+  // press is the copy. The page's own scrollbar stays out: dragging it is scrolling.
+  function onScrollbar(el, x, y) {
+    if (!el || el === document.documentElement || !el.getBoundingClientRect) return false;
+    if (!el.offsetWidth || !el.offsetHeight) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width <= 0 || r.height <= 0) return false;
+    // layout pixels to screen pixels, as in drawPadding
+    const sx = r.width / el.offsetWidth;
+    const sy = r.height / el.offsetHeight;
+    const cs = getComputedStyle(el);
+    const num = (v) => parseFloat(v) || 0;
+    // on the border a click still comes, and the click handler owns that press
+    if (x < r.left + num(cs.borderLeftWidth) * sx || x > r.right - num(cs.borderRightWidth) * sx ||
+        y < r.top + num(cs.borderTopWidth) * sy || y > r.bottom - num(cs.borderBottomWidth) * sy) return false;
+    // inside the border and outside the client box: only a scrollbar lives there
+    const left = r.left + el.clientLeft * sx;
+    const top = r.top + el.clientTop * sy;
+    return x < left || x > left + el.clientWidth * sx || y < top || y > top + el.clientHeight * sy;
+  }
+
+  function copyFromScrollbar(e) {
+    if (e.button !== 0) return;
+    const hit = e.composedPath ? e.composedPath()[0] : e.target;
+    if (!(hit instanceof Element) || !onScrollbar(hit, e.clientX, e.clientY)) return;
+    // the same resolving the click does, so the card is the element the bubble shows
+    copyText(idCard(resolveTarget(hit, e.clientX, e.clientY))).then((ok) => flash(ok));
+  }
   for (const type of ['pointerdown', 'mousedown', 'mouseup', 'auxclick', 'dblclick']) {
     document.addEventListener(type, swallow, true);
   }

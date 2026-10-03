@@ -42,14 +42,17 @@ narrow width.
 
 **R-04 · Attach a project, read-only** (M)
 Paste a folder path, Rocket reads it and says what it found: the framework, the
-styling system, the file where the helper line will go.
+styling system, the file where the backup helper line would go.
 Your check: attach DS Tiger, see it described correctly. Attach a nonsense path,
 see a polite refusal.
 
 **R-05 · The site appears inside Rocket** (M)
 You start the client dev server in your terminal as usual; Rocket frames it.
-Width presets for narrow and wide.
-Your check: DS Tiger runs live inside Rocket and responds normally.
+Width presets for narrow and wide. A site on 127.0.0.1 is steered to its
+localhost address; a site on any other address, which the helper extension
+cannot reach, is named as out of reach.
+Your check: DS Tiger runs live inside Rocket and responds normally. Then give
+it an address other than localhost, and read the message.
 
 **R-06 · Login survives the frame** (S, the S-A spike)
 The origin design from the architecture, proven on this machine: a logged-in app
@@ -57,11 +60,34 @@ stays logged in inside Rocket.
 Your check: log into one of your systems, open it inside Rocket, still logged
 in. Also the secure-mode trap is tested and its answer written down.
 
-**R-07 · The helper line, hand-pasted** (M)
-Rocket shows the exact line and the exact file. You paste it with your editor.
-The panel indicator goes green when the helper answers, and stays visible for
-the whole engagement.
-Your check: paste, indicator green. Delete it, indicator says so.
+**R-07 · The helper extension** (L)
+The helper arrives through its own small Chrome extension, which you load once
+per Chrome profile, with developer mode left on, the way you loaded the
+Inspector. It wakes only in a page framed by Rocket's panel, on localhost,
+changes nothing on the page until it has loaded and gone quiet, and talks to
+the panel only through the extension. The panel checks that the framed site
+looks like the attached project, which brings the engine's bare found-or-not
+text search forward from R-20; R-20 later adds its matching rules. The
+indicator goes green when the helper answers, names the route it came by, and
+stays visible for the whole engagement.
+My built-in browser cannot load extensions, so this task, and every later one
+that uses the helper, is tested through your real Chrome or with the helper
+run as a page script on a test page. It starts by proving three things: the
+helper reaches inside Rocket's frame, a server-drawn React page shows no
+takeover warning with the helper on, and its link to the panel survives a few
+idle minutes.
+Your check: load the extension, open your site inside Rocket, indicator green.
+Open the same site in a plain tab, nothing of Rocket there. Frame a different
+local project, and the panel says it does not look like the attached one. Turn
+the extension off, and the indicator says so.
+
+**R-07b · The backup line, hand-pasted** (M)
+For a Chrome that forbids the extension, or another browser. Rocket shows the
+exact line and the exact file. You paste it with your editor. The indicator
+names this route. If the extension answers too, the panel uses it and says the
+line can come out.
+Your check: with the extension off, paste, indicator green by the backup route.
+Delete it, indicator says so.
 
 **R-08 · Hover highlights** (S)
 Move the mouse over the site, elements outline with a label of what they are.
@@ -75,8 +101,11 @@ correctly.
 
 **R-10 · Real values on the selection** (M)
 The card shows the selection's actual rendered values: padding, size, colours,
-corner, text size.
-Your check: the numbers match what your eyes say about the element.
+corner, text size. Values are read with the element at rest, never while the
+cursor makes it show its hover styling.
+Your check: the numbers match what your eyes say about the element. Click a
+button that darkens on hover, move to the panel: the card shows its resting
+colour.
 
 **R-11 · The first live control** (L)
 One padding control wired end to end: drag, the site changes instantly, nothing
@@ -148,9 +177,12 @@ variant.
 Click visible text, edit it in place, preview live. Editability is decided by
 the engine searching the project's files for the exact string, read-only: found
 means editable with confidence, not found means live data, explained in plain
-words and read-only.
+words and read-only. The search compares words, not characters: spacing,
+capitals set by styling, and the way the code writes an apostrophe never change
+the verdict.
 Your check: rewrite a heading. Then try text that comes from data, and read the
-refusal. It should make sense to you, not to a programmer.
+refusal. It should make sense to you, not to a programmer. Then a heading the
+page shows in capitals, and one with an apostrophe: both editable.
 
 **R-21 · The inventory panel** (M)
 The project's own palette, type scale and spacing steps, read from its theme
@@ -177,13 +209,22 @@ back. Then send a group that restyles an element carrying a pending draft, and
 the draft still comes back.
 
 **R-22c · Landed, verified by reading** (M)
-After a sent group's reload, Rocket re-reads the real rendered values and marks
+After the reload or hot update that carries a sent group's change, Rocket
+re-reads the real rendered values and marks
 the group landed when they match, landed with a deviation when the executor
 rightly snapped a free custom value to the project's scale, or off with the
-mismatch named in plain words.
+mismatch named in plain words. Before reading, the sent group's own preview is
+switched off, along with any draft covering what is read, restored after, so
+the read sees Claude's code, and the read waits for fonts, transitions and
+hover to settle. A match is judged by a per-property rule written down
+before this task starts. A "just this one" change on an element with
+look-alikes is also checked for spread: if the look-alikes moved too, the group
+is off, named.
 Your check: send a group, watch it turn landed on its own. Send a snap-allowed
 13 that lands at 16, and see it named as landed at 16, not as broken. Sabotage
-a value in the code by hand, and watch it turn off, named.
+a value in the code by hand, and watch it turn off, named. Put a "just this
+one" change on one card of a row, let the code change the shared card instead,
+and watch it turn off, naming the spread.
 
 **R-23 · The loop, measured** (M, the S-LOOP spike, the product's core bet)
 Ten real changes on a calibration project, grouped by visual context into three
@@ -210,7 +251,8 @@ loop, verified by your eyes on the live site.
 Hover "shared, 12 on this page" and see them light up in the preview.
 Your check: hover it, count the highlights yourself.
 
-**R-26 · The clean check** (S)
+**R-26 · The clean check, for the backup line** (S)
+Needed only when the helper came by the pasted backup line.
 One click, read-only: is the helper line still in the project, and is anything
 of Rocket's lying around. Results name the file in your terms, and the same
 status lives permanently in the helper indicator, not only behind a button.
@@ -255,12 +297,16 @@ in front of a client.
 
 ## Counts and honesty
 
-Thirty-four tasks: Phase A thirteen, Phase B thirteen, Phase C eight. At the
+Thirty-five tasks: Phase A fourteen, Phase B thirteen, Phase C eight. At the
 architecture's estimate that is five to seven solo weeks to the end of Phase B
 and seven to ten overall, alongside client work, so calendar time stretches.
+Those weeks were set before the helper extension, which adds a few days to
+Phase A.
 
-Two tasks need something from you beyond checks: R-24's three change requests,
-and R-31's design. Everything else needs only your eyes at the end of each task.
+Three tasks need something from you beyond checks: loading R-07's extension
+into your Chrome, and reloading it after each helper change while it is built;
+R-24's three change requests; and R-31's design. Everything else needs only
+your eyes at the end of each task.
 
 The plan bends where reality pushes back: R-23's score is the one number that
 can reorder Phase C, and the architecture's spike table says what else can

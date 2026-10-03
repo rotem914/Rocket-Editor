@@ -22,6 +22,7 @@ The owner-curated open-items list. One place to see what is still open.
 
 | Added | Item | Source |
 |---|---|---|
+| 2026-09-23 | Inspector: the bubble and the copied card read an element's hover look, because the cursor is on it; read the normal look instead, either with an invisible sheet while the key is held or with a "while hovered" label | Chat, 2026-09-23, the canvas-capture review |
 | 2026-09-06 | Inspector: a wrapper holding a single child is easy to hover and says nothing, while the child that holds the real spacing can be unreachable when it is exactly as tall as its own contents; consider handing the hover to that single child | Chat, 2026-09-06, the tab row whose 8px gaps appeared to be missing |
 | 2026-09-04 | Inspector: an overlay that really paints, like the gradient a card lays over its picture on hover, still hides what is under it; skipping it would hide something a person can see, so it needs a deliberate way through | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
 | 2026-09-04 | Inspector bubble: say `Canvas` for a canvas element, since everything drawn inside one has no elements to point at and a bare size explains nothing | Chat, 2026-09-04, the overlay-cases pass; the other four were fixed the same day |
